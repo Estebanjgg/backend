@@ -1,0 +1,1768 @@
+openapi: 3.0.3
+info:
+  title: Voke E-commerce API
+  description: |
+    Complete API for the Voke electronic store.
+    
+    This API provides endpoints to manage products, categories, shopping cart, and user authentication.
+    
+    ## Main Features:
+    - Complete electronic product management
+    - Advanced filtering by categories, prices, and brands
+    - Product search functionality
+    - Result pagination
+    - Featured products and offers
+    - Shopping cart with session support
+    - JWT user authentication
+    - Interactive Swagger documentation
+    
+    ## Authentication
+    The API uses JWT (JSON Web Tokens) for authentication. For protected endpoints,
+    include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    ## Shopping Cart
+    The cart supports both anonymous users (using session_id) and authenticated
+    users (using user_id). When logging in, the cart is automatically migrated.
+    
+    ## Base URL
+    - **Development:** `http://localhost:3001/api`
+    - **Production:** `https://tu-app-voke-backend-7da6ed58e5fc.herokuapp.com/api`
+  version: 1.0.0
+  contact:
+    name: Voke Team
+    email: support@voke.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://tu-app-voke-backend-7da6ed58e5fc.herokuapp.com/api
+    description: Production Server (Heroku)
+  - url: http://localhost:3001/api
+    description: Development Server
+
+paths:
+  /products:
+    get:
+      summary: Get all products
+      description: |
+        Returns a list of products with optional filters.
+        
+        Supports filtering by category, brand, price, condition and more.
+      tags:
+        - Products
+      parameters:
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          schema:
+            type: string
+            enum: [Smartphone, Tablet, Notebook, Electronics]
+            example: Smartphone
+        - name: brand
+          in: query
+          description: Filter by brand
+          required: false
+          schema:
+            type: string
+            example: Apple
+        - name: minPrice
+          in: query
+          description: Minimum price
+          required: false
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            example: 100.00
+        - name: maxPrice
+          in: query
+          description: Maximum price
+          required: false
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            example: 5000.00
+        - name: condition
+          in: query
+          description: Product condition
+          required: false
+          schema:
+            type: string
+            enum: [Novo, Seminovo, Used]
+            example: Novo
+        - name: featured
+          in: query
+          description: Solo productos destacados
+          required: false
+          schema:
+            type: boolean
+            example: true
+        - name: offer
+          in: query
+          description: Solo productos en oferta
+          required: false
+          schema:
+            type: boolean
+            example: true
+        - name: bestseller
+          in: query
+          description: Solo productos más vendidos
+          required: false
+          schema:
+            type: boolean
+            example: true
+        - name: search
+          in: query
+          description: Search por texto en título, descripción o brand
+          required: false
+          schema:
+            type: string
+            example: iPhone
+        - name: limit
+          in: query
+          description: Número maximum de productos a retornar
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 10
+        - name: offset
+          in: query
+          description: Número de productos a omitir (para paginación)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: Lista de productos obtenida successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      summary: Create new product
+      description: Creates a new product en la base de datos
+      tags:
+        - Products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product created successfully
+                  data:
+                    $ref: '#/components/schemas/Product'
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /products/{id}:
+    get:
+      summary: Get product by ID
+      description: Retorna los detalles de un producto específico
+      tags:
+        - Products
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique product ID
+          schema:
+            type: string
+            format: uuid
+            example: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    put:
+      summary: Update product
+      description: Actualiza los datos de un producto existente
+      tags:
+        - Products
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique product ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '200':
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product updated successfully
+                  data:
+                    $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Datos de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      summary: Delete product
+      description: Deletes a product de la base de datos
+      tags:
+        - Products
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique product ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product deleted successfully
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /categories:
+    get:
+      summary: Get all categories
+      description: Retorna una lista de todas las categorías disponibles
+      tags:
+        - Categories
+      responses:
+        '200':
+          description: Lista de categorías obtenida successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /categories/{category}/products:
+    get:
+      summary: Get products by category
+      description: Retorna todos los productos de una categoría específica
+      tags:
+        - Categories
+      parameters:
+        - name: category
+          in: path
+          required: true
+          description: Nombre de la categoría
+          schema:
+            type: string
+            enum: [Smartphone, Tablet, Notebook, Electronics]
+            example: Smartphone
+        - name: limit
+          in: query
+          description: Número maximum de productos a retornar
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Número de productos a omitir
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Products de la categoría obtenidos successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart:
+    get:
+      summary: Get shopping cart
+      description: Retorna todos los productos en el carrito del usuario o sesión
+      tags:
+        - Cart
+      parameters:
+        - name: x-user-id
+          in: header
+          description: User ID (optional)
+          required: false
+          schema:
+            type: string
+            example: user123
+        - name: x-session-id
+          in: header
+          description: Session ID (optional)
+          required: false
+          schema:
+            type: string
+            example: session456
+        - name: user_id
+          in: query
+          description: User ID (alternativo)
+          required: false
+          schema:
+            type: string
+        - name: session_id
+          in: query
+          description: Session ID (alternativo)
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cart retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CartItem'
+                  count:
+                    type: integer
+                    example: 3
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/summary:
+    get:
+      summary: Get cart summary
+      description: Returns cart summary with totals
+      tags:
+        - Cart
+      parameters:
+        - name: x-user-id
+          in: header
+          description: User ID
+          required: false
+          schema:
+            type: string
+        - name: x-session-id
+          in: header
+          description: Session ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cart summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/CartSummary'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/add:
+    post:
+      summary: Add product to cart
+      description: Adds a product to the cart o actualiza la cantidad si ya existe
+      tags:
+        - Cart
+      parameters:
+        - name: x-user-id
+          in: header
+          description: User ID
+          required: false
+          schema:
+            type: string
+        - name: x-session-id
+          in: header
+          description: Session ID
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                  description: Product ID
+                  example: 123e4567-e89b-12d3-a456-426614174000
+                quantity:
+                  type: integer
+                  minimum: 1
+                  description: Cantidad a agregar
+                  example: 2
+              required:
+                - product_id
+      responses:
+        '201':
+          description: Product added to cart successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product added to cart
+                  data:
+                    $ref: '#/components/schemas/CartItem'
+        '400':
+          description: Invalid data o stock insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/update/{id}:
+    put:
+      summary: Update cart quantity
+      description: Updates product quantity en el carrito
+      tags:
+        - Cart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del item del carrito
+          schema:
+            type: string
+            format: uuid
+        - name: x-user-id
+          in: header
+          description: User ID
+          required: false
+          schema:
+            type: string
+        - name: x-session-id
+          in: header
+          description: Session ID
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 0
+                  description: Nueva cantidad (0 para eliminar)
+                  example: 3
+              required:
+                - quantity
+      responses:
+        '200':
+          description: Cantidad actualizada successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cantidad actualizada
+                  data:
+                    $ref: '#/components/schemas/CartItem'
+        '400':
+          description: Invalid data o stock insuficiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/remove/{id}:
+    delete:
+      summary: Remove product from cart
+      description: Deletes a product específico del carrito
+      tags:
+        - Cart
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del item del carrito
+          schema:
+            type: string
+            format: uuid
+        - name: x-user-id
+          in: header
+          description: User ID
+          required: false
+          schema:
+            type: string
+        - name: x-session-id
+          in: header
+          description: Session ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product removed from cart
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/clear:
+    delete:
+      summary: Clear cart
+      description: Elimina todos los productos del carrito
+      tags:
+        - Cart
+      parameters:
+        - name: x-user-id
+          in: header
+          description: User ID
+          required: false
+          schema:
+            type: string
+        - name: x-session-id
+          in: header
+          description: Session ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cart cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cart cleared successfully
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cart/migrate:
+    post:
+      summary: Migrate session cart to user
+      description: Migrates cart products de una sesión anónima a un usuario autenticado
+      tags:
+        - Cart
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario autenticado
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                  description: ID de la sesión anónima
+                  example: session456
+              required:
+                - session_id
+      responses:
+        '200':
+          description: Cart migrated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cart migrated successfully
+                  data:
+                    type: object
+                    properties:
+                      migratedItems:
+                        type: integer
+                        example: 3
+                      totalValue:
+                        type: number
+                        format: float
+                        example: 12899.97
+        '400':
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # =====================================================
+  # ENDPOINTS DE AUTENTICACIÓN
+  # =====================================================
+  
+  /auth/register:
+    post:
+      summary: Register new user
+      description: Creates a new user account en el sistema
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Unique user email
+                  example: usuario@example.com
+                password:
+                  type: string
+                  minLength: 6
+                  description: User password (minimum 6 characters)
+                  example: mi_password_123
+                first_name:
+                  type: string
+                  minLength: 2
+                  description: User first name
+                  example: Juan
+                last_name:
+                  type: string
+                  description: User last name (optional)
+                  example: Pérez
+                phone:
+                  type: string
+                  description: User phone (optional)
+                  example: +1234567890
+                session_id:
+                  type: string
+                  description: Session ID para migrar carrito (optional)
+                  example: session_abc123
+              required:
+                - email
+                - password
+                - first_name
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User registered successfully
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        description: JWT token para autenticación
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      summary: Login user
+      description: Authenticates a user y devuelve un token JWT
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email
+                  example: usuario@example.com
+                password:
+                  type: string
+                  description: User password
+                  example: mi_password_123
+                session_id:
+                  type: string
+                  description: Session ID para migrar carrito (optional)
+                  example: session_abc123
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successful
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        description: JWT token para autenticación
+                        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      description: Logs out the user autenticado
+      tags:
+        - Authentication
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Logout successful
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/me:
+    get:
+      summary: Get user profile
+      description: Gets profile information del usuario autenticado
+      tags:
+        - Authentication
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/profile:
+    put:
+      summary: Update user profile
+      description: Updates profile information del usuario autenticado
+      tags:
+        - Authentication
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  minLength: 2
+                  description: New nombre del usuario
+                  example: Juan Carlos
+                last_name:
+                  type: string
+                  description: New apellido del usuario
+                  example: Pérez García
+                phone:
+                  type: string
+                  description: New teléfono del usuario
+                  example: +1234567890
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Profile updated successfully
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/change-password:
+    put:
+      summary: Change password
+      description: Changes user password autenticado
+      tags:
+        - Authentication
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                current_password:
+                  type: string
+                  description: Current password del usuario
+                  example: mi_password_actual
+                new_password:
+                  type: string
+                  minLength: 6
+                  description: New password (minimum 6 characters)
+                  example: mi_nueva_password_123
+              required:
+                - current_password
+                - new_password
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Password changed successfully
+        '400':
+          description: Invalid data o contraseña actual incorrecta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verify-token:
+    post:
+      summary: Verify JWT token
+      description: Verifies if a JWT token is valid y devuelve información del usuario
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: JWT token a verificar
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+              required:
+                - token
+      responses:
+        '200':
+          description: Token valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Token valid
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Token required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/account:
+    delete:
+      summary: Deactivate account
+      description: Deactivates user account autenticado (soft delete)
+      tags:
+        - Authentication
+      parameters:
+        - name: Authorization
+          in: header
+          description: JWT token del usuario
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  description: User password para confirmar la desactivación
+                  example: mi_password_123
+              required:
+                - password
+      responses:
+        '200':
+          description: Account deactivated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Account deactivated successfully
+        '400':
+          description: Password required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid token o contraseña incorrecta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user ID
+          example: user123e4567-e89b-12d3-a456-426614174000
+        email:
+          type: string
+          format: email
+          description: User email
+          example: usuario@example.com
+        first_name:
+          type: string
+          description: User first name
+          example: Juan
+        last_name:
+          type: string
+          description: User last name
+          example: Pérez
+        phone:
+          type: string
+          description: User phone
+          example: +1234567890
+        is_active:
+          type: boolean
+          description: If the user is active
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date
+          example: 2025-08-22T16:33:53.03547+00:00
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update date
+          example: 2025-08-22T16:33:53.03547+00:00
+      required:
+        - id
+        - email
+        - first_name
+        - is_active
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique product ID
+          example: 123e4567-e89b-12d3-a456-426614174000
+        title:
+          type: string
+          description: Título del producto
+          example: iPhone 13 128GB - Azul
+        brand:
+          type: string
+          description: Product brand
+          example: Apple
+        category:
+          type: string
+          description: Product category
+          enum: [Smartphone, Tablet, Notebook, Electronics]
+          example: Smartphone
+        original_price:
+          type: number
+          format: float
+          description: Price original del producto
+          example: 4999.99
+        current_price:
+          type: number
+          format: float
+          description: Price actual del producto
+          example: 4299.99
+        discount:
+          type: integer
+          description: Porcentaje de descuento
+          minimum: 0
+          maximum: 100
+          example: 14
+        installments:
+          type: object
+          description: Información de cuotas
+          properties:
+            times:
+              type: string
+              example: 12x
+            value:
+              type: string
+              example: 358,33
+        image:
+          type: string
+          description: Image URL del producto
+          example: https://example.com/image.jpg
+        description:
+          type: string
+          description: Product description
+          example: iPhone 13 com chip A15 Bionic, sistema de câmera dupla avançado
+        stock:
+          type: integer
+          description: Cantidad en stock
+          minimum: 0
+          example: 20
+        is_active:
+          type: boolean
+          description: Si el producto está activo
+          example: true
+        is_featured:
+          type: boolean
+          description: If the product is featured
+          example: true
+        is_offer:
+          type: boolean
+          description: If the product is on sale
+          example: true
+        is_best_seller:
+          type: boolean
+          description: Si el producto es más vendido
+          example: true
+        condition:
+          type: string
+          description: Product condition
+          enum: [Novo, Seminovo, Used]
+          example: Novo
+        warranty:
+          type: string
+          description: Garantía del producto
+          example: 1 ano
+        specifications:
+          type: object
+          description: Especificaciones técnicas del producto
+          example:
+            processador: A15 Bionic
+            armazenamento: 128GB
+            camera: 12MP dupla
+            tela: 6.1 polegadas
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date
+          example: 2025-08-22T16:33:53.03547+00:00
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update date
+          example: 2025-08-22T16:33:53.03547+00:00
+      required:
+        - id
+        - title
+        - category
+        - current_price
+        - is_active
+
+    ProductInput:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Título del producto
+          example: iPhone 13 128GB - Azul
+        brand:
+          type: string
+          description: Product brand
+          example: Apple
+        category:
+          type: string
+          description: Product category
+          enum: [Smartphone, Tablet, Notebook, Electronics]
+          example: Smartphone
+        originalPrice:
+          type: number
+          format: float
+          description: Price original del producto
+          example: 4999.99
+        currentPrice:
+          type: number
+          format: float
+          description: Price actual del producto
+          example: 4299.99
+        discount:
+          type: integer
+          description: Porcentaje de descuento
+          minimum: 0
+          maximum: 100
+          example: 14
+        installments:
+          type: object
+          description: Información de cuotas
+          properties:
+            times:
+              type: string
+              example: 12x
+            value:
+              type: string
+              example: 358,33
+        image:
+          type: string
+          description: Image URL del producto
+          example: https://example.com/image.jpg
+        description:
+          type: string
+          description: Product description
+          example: iPhone 13 com chip A15 Bionic
+        stock:
+          type: integer
+          description: Cantidad en stock
+          minimum: 0
+          example: 20
+        isActive:
+          type: boolean
+          description: Si el producto está activo
+          default: true
+        isFeatured:
+          type: boolean
+          description: If the product is featured
+          default: false
+        isOffer:
+          type: boolean
+          description: If the product is on sale
+          default: false
+        isBestSeller:
+          type: boolean
+          description: Si el producto es más vendido
+          default: false
+        condition:
+          type: string
+          description: Product condition
+          enum: [Novo, Seminovo, Used]
+          default: Novo
+        warranty:
+          type: string
+          description: Garantía del producto
+          example: 1 ano
+        specifications:
+          type: object
+          description: Especificaciones técnicas del producto
+      required:
+        - title
+        - category
+        - currentPrice
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único de la categoría
+          example: 1
+        name:
+          type: string
+          description: Nombre de la categoría
+          example: Smartphone
+        description:
+          type: string
+          description: Descripción de la categoría
+          example: Phones inteligentes
+        is_active:
+          type: boolean
+          description: Si la categoría está activa
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update date
+      required:
+        - id
+        - name
+        - is_active
+
+    Pagination:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Número de elementos en la respuesta actual
+          example: 10
+        offset:
+          type: integer
+          description: Número de elementos omitidos
+          example: 0
+        limit:
+          type: integer
+          description: Limit maximum de elementos
+          example: 20
+        total:
+          type: integer
+          description: Total de elementos disponibles
+          example: 51
+      required:
+        - count
+        - offset
+        - limit
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único del item del carrito
+          example: cart123e4567-e89b-12d3-a456-426614174000
+        user_id:
+          type: string
+          description: User ID (si está logueado)
+          example: user123
+        session_id:
+          type: string
+          description: Session ID (si es anónimo)
+          example: session456
+        product_id:
+          type: string
+          format: uuid
+          description: Product ID
+          example: 123e4567-e89b-12d3-a456-426614174000
+        quantity:
+          type: integer
+          minimum: 1
+          description: Product quantity
+          example: 2
+        price:
+          type: number
+          format: float
+          description: Product price al momento de agregarlo
+          example: 4299.99
+        created_at:
+          type: string
+          format: date-time
+          description: Creation date
+          example: 2025-08-22T16:33:53.03547+00:00
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update date
+          example: 2025-08-22T16:33:53.03547+00:00
+        products:
+          $ref: '#/components/schemas/Product'
+      required:
+        - id
+        - product_id
+        - quantity
+        - price
+
+    CartSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+          description: Lista de productos en el carrito
+        itemCount:
+          type: integer
+          description: Number of unique products
+          example: 3
+        totalQuantity:
+          type: integer
+          description: Cantidad total de productos
+          example: 5
+        subtotal:
+          type: number
+          format: float
+          description: Subtotal sin descuentos
+          example: 12999.95
+        totalDiscount:
+          type: number
+          format: float
+          description: Total de descuentos aplicados
+          example: 1500.00
+        total:
+          type: number
+          format: float
+          description: Total final a pagar
+          example: 11499.95
+      required:
+        - items
+        - itemCount
+        - totalQuantity
+        - subtotal
+        - totalDiscount
+        - total
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Mensaje de error
+          example: Internal server error
+        error:
+          type: string
+          description: Detalles del error
+          example: Database connection failed
+      required:
+        - success
+        - message
+
+tags:
+  - name: Products
+    description: Operations related to products
+  - name: Categories
+    description: Operations related to categories
+  - name: Cart
+    description: Operations related to shopping cart
+  - name: Authentication
+    description: Operations related to authentication and user management
+
+externalDocs:
+  description: Repositorio del proyecto
+  url: https://github.com/tu-usuario/projecto-final-toti-voke
