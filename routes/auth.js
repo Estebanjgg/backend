@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Cart = require('../models/Cart');
+const emailService = require('../utils/emailService');
 const {
   authenticateToken,
   validateRegistration,
@@ -371,14 +372,26 @@ router.post('/forgot-password', async (req, res) => {
     // Generar token de recuperación
     const resetToken = user.generateResetToken();
     
-    // Aquí normalmente enviarías un email
-    // Por ahora, solo devolvemos el token para testing
-    console.log(`Token de recuperación para ${email}: ${resetToken}`);
+    // Enviar email de recuperación usando EmailJS
+    console.log(`📧 Generando token de recuperación para ${email}: ${resetToken}`);
+    
+    if (emailService.isConfigured()) {
+      const emailResult = await emailService.sendPasswordResetEmail(email, resetToken);
+      
+      if (emailResult.success) {
+        console.log('✅ Email de recuperación enviado exitosamente');
+      } else {
+        console.error('❌ Error enviando email:', emailResult.error);
+        // Continuar sin fallar - el usuario no debe saber si falló el email
+      }
+    } else {
+      console.warn('⚠️ EmailJS no está configurado. Email no enviado.');
+    }
     
     res.json({
       success: true,
       message: 'Si el email existe, recibirás un enlace de recuperación',
-      // En producción, NO devolver el token
+      // En desarrollo, mostrar el token para testing
       resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
     });
   } catch (error) {
