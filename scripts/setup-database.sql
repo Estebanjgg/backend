@@ -152,9 +152,16 @@ COMMENT ON COLUMN cart_items.price IS 'Precio del producto al momento de agregar
 -- Tabla para almacenar los productos favoritos de los usuarios
 CREATE TABLE IF NOT EXISTS user_favorites (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   product_id INTEGER NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  
+  -- Foreign keys con referencia a las tablas existentes
+  CONSTRAINT fk_user_favorites_user_id 
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  -- NOTA: product_id referencia products(id) - asegúrate de que la tabla products existe
+  -- CONSTRAINT fk_user_favorites_product_id 
+  --   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   
   -- Evitar duplicados: un usuario solo puede tener un producto como favorito una vez
   UNIQUE(user_id, product_id)

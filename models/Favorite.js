@@ -9,7 +9,7 @@ class Favorite {
         .insert([
           { 
             user_id: userId, 
-            product_id: parseInt(productId) 
+            product_id: productId 
           }
         ])
         .select();
@@ -36,7 +36,7 @@ class Favorite {
         .from('user_favorites')
         .delete()
         .eq('user_id', userId)
-        .eq('product_id', parseInt(productId))
+        .eq('product_id', productId)
         .select();
 
       if (error) throw error;
@@ -73,7 +73,7 @@ class Favorite {
         .from('user_favorites')
         .select('id')
         .eq('user_id', userId)
-        .eq('product_id', parseInt(productId))
+        .eq('product_id', productId)
         .single();
 
       if (error && error.code !== 'PGRST116') {

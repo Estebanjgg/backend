@@ -14,13 +14,16 @@ router.use(authenticateToken);
  *       type: object
  *       properties:
  *         id:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *           description: ID único del favorito
  *         user_id:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *           description: ID del usuario
  *         product_id:
- *           type: integer
+ *           type: string
+ *           format: uuid
  *           description: ID del producto
  *         created_at:
  *           type: string
@@ -123,8 +126,9 @@ router.get('/count', async (req, res) => {
  *         name: productId
  *         required: true
  *         schema:
- *           type: integer
- *         description: ID del producto
+ *           type: string
+ *           format: uuid
+ *         description: ID del producto (UUID)
  *     responses:
  *       201:
  *         description: Producto agregado a favoritos
@@ -136,9 +140,10 @@ router.get('/count', async (req, res) => {
 router.post('/:productId', async (req, res) => {
   try {
     const userId = req.user.id;
-    const productId = parseInt(req.params.productId);
+    const productId = req.params.productId;
 
-    if (!productId || productId <= 0) {
+    // Validar que el productId sea un UUID válido
+    if (!productId || typeof productId !== 'string' || productId.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'ID de producto inválido'
@@ -182,8 +187,9 @@ router.post('/:productId', async (req, res) => {
  *         name: productId
  *         required: true
  *         schema:
- *           type: integer
- *         description: ID del producto
+ *           type: string
+ *           format: uuid
+ *         description: ID del producto (UUID)
  *     responses:
  *       200:
  *         description: Producto removido de favoritos
@@ -195,9 +201,10 @@ router.post('/:productId', async (req, res) => {
 router.delete('/:productId', async (req, res) => {
   try {
     const userId = req.user.id;
-    const productId = parseInt(req.params.productId);
+    const productId = req.params.productId;
 
-    if (!productId || productId <= 0) {
+    // Validar que el productId sea un UUID válido
+    if (!productId || typeof productId !== 'string' || productId.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'ID de producto inválido'
@@ -239,8 +246,9 @@ router.delete('/:productId', async (req, res) => {
  *         name: productId
  *         required: true
  *         schema:
- *           type: integer
- *         description: ID del producto
+ *           type: string
+ *           format: uuid
+ *         description: ID del producto (UUID)
  *     responses:
  *       200:
  *         description: Estado del favorito
@@ -257,9 +265,10 @@ router.delete('/:productId', async (req, res) => {
 router.get('/check/:productId', async (req, res) => {
   try {
     const userId = req.user.id;
-    const productId = parseInt(req.params.productId);
+    const productId = req.params.productId;
 
-    if (!productId || productId <= 0) {
+    // Validar que el productId sea un UUID válido
+    if (!productId || typeof productId !== 'string' || productId.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'ID de producto inválido'
