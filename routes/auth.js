@@ -164,6 +164,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 // PUT /api/auth/profile - Actualizar perfil del usuario
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
+    console.log('🔍 req.body completo:', req.body);
+    console.log('🔍 req.body tipo:', typeof req.body);
+    console.log('🔍 req.body keys:', Object.keys(req.body));
+    
     const { first_name, last_name, phone } = req.body;
     console.log('Datos recibidos para actualizar perfil:', { first_name, last_name, phone });
 
