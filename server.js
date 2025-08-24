@@ -26,6 +26,7 @@ const frontendUrls = process.env.FRONTEND_URL
 const allowedOrigins = [
   ...frontendUrls,
   'http://localhost:5174',
+  'http://localhost:5175',
   'https://projecto-final-toti-voke-x5vm.vercel.app', // Dominio real de Vercel
   'https://projecto-final-toti-voke.vercel.app' // Dominio alternativo de Vercel
 ];
