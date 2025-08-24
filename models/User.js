@@ -183,10 +183,13 @@ class User {
       const allowedFields = ['first_name', 'last_name', 'phone'];
       const updates = {};
       
-      // Solo permitir campos específicos
+      // Solo permitir campos específicos y no vacíos
       for (const field of allowedFields) {
         if (updateData[field] !== undefined) {
-          updates[field] = updateData[field]?.trim();
+          const trimmedValue = updateData[field]?.trim();
+          if (trimmedValue && trimmedValue.length > 0) {
+            updates[field] = trimmedValue;
+          }
         }
       }
 
