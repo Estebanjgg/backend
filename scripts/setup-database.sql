@@ -146,7 +146,40 @@ COMMENT ON COLUMN cart_items.quantity IS 'Cantidad del producto en el carrito';
 COMMENT ON COLUMN cart_items.price IS 'Precio del producto al momento de agregarlo al carrito';
 
 -- =====================================================
--- 3. VERIFICACIONES FINALES
+-- 3. CREAR TABLA DE FAVORITOS
+-- =====================================================
+
+-- Tabla para almacenar los productos favoritos de los usuarios
+CREATE TABLE IF NOT EXISTS user_favorites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  
+  -- Evitar duplicados: un usuario solo puede tener un producto como favorito una vez
+  UNIQUE(user_id, product_id)
+);
+
+-- Índices para optimizar consultas
+CREATE INDEX IF NOT EXISTS idx_user_favorites_user_id ON user_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_product_id ON user_favorites(product_id);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_created_at ON user_favorites(created_at);
+
+-- Habilitar RLS (Row Level Security)
+ALTER TABLE user_favorites ENABLE ROW LEVEL SECURITY;
+
+-- Política para permitir todas las operaciones (ya que manejamos la seguridad en el backend)
+CREATE POLICY "Allow all operations on user_favorites" ON user_favorites
+    FOR ALL USING (true) WITH CHECK (true);
+
+-- Comentarios para documentación
+COMMENT ON TABLE user_favorites IS 'Almacena los productos favoritos de cada usuario';
+COMMENT ON COLUMN user_favorites.user_id IS 'ID del usuario que marcó el producto como favorito';
+COMMENT ON COLUMN user_favorites.product_id IS 'ID del producto marcado como favorito';
+COMMENT ON COLUMN user_favorites.created_at IS 'Fecha y hora cuando se agregó a favoritos';
+
+-- =====================================================
+-- 4. VERIFICACIONES FINALES
 -- =====================================================
 
 -- Verificar que las tablas se crearon correctamente
@@ -172,6 +205,17 @@ FROM information_schema.columns
 WHERE table_name = 'cart_items' 
 ORDER BY ordinal_position;
 
+SELECT 'TABLA USER_FAVORITES:' as info;
+SELECT 
+    table_name,
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_name = 'user_favorites' 
+ORDER BY ordinal_position;
+
 -- Mostrar usuarios creados
 SELECT 'USUARIOS CREADOS:' as info;
 SELECT 
@@ -193,5 +237,5 @@ SELECT
     tablename,
     tableowner
 FROM pg_tables 
-WHERE tablename IN ('users', 'cart_items', 'products', 'categories')
+WHERE tablename IN ('users', 'cart_items', 'products', 'categories', 'user_favorites')
 ORDER BY tablename;

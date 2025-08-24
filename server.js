@@ -8,6 +8,7 @@ const productRoutes = require('./routes/products');
 const categoryRoutes = require('./routes/categories');
 const cartRoutes = require('./routes/cart');
 const authRoutes = require('./routes/auth');
+const favoriteRoutes = require('./routes/favorites');
 const { setupSwagger } = require('./config/swagger');
 
 const app = express();
@@ -77,6 +78,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/favorites', favoriteRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
