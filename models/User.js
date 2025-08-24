@@ -200,7 +200,7 @@ class User {
                 updates[field] = trimmedValue;
               }
             } else if (field === 'phone') {
-              // Para phone, permitir valores vacíos (se guarda como null o string vacío)
+              // Para phone, siempre incluir la actualización (permite eliminar)
               updates[field] = trimmedValue.length > 0 ? trimmedValue : null;
             }
           }
