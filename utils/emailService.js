@@ -26,6 +26,8 @@ class EmailService {
    */
   async sendPasswordResetEmail(email, resetToken, frontendUrl = process.env.FRONTEND_URL) {
     try {
+      console.log('🔧 EmailJS Config Status:', this.getConfigStatus());
+      
       const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
       
       const templateParams = {
@@ -36,6 +38,9 @@ class EmailService {
 
       console.log('📧 Enviando email de recuperación a:', email);
       console.log('🔗 Link de recuperación:', resetLink);
+      console.log('📋 Template params:', templateParams);
+      console.log('🔑 Service ID:', this.serviceId);
+      console.log('📄 Template ID:', this.templateId);
 
       const response = await emailjs.send(
         this.serviceId,
