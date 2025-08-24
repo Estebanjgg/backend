@@ -27,7 +27,7 @@ class EmailService {
   
   createTransporter() {
     try {
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: this.smtpHost,
         port: this.smtpPort,
         secure: false, // true for 465, false for other ports
