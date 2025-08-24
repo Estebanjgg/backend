@@ -183,12 +183,13 @@ class User {
       const allowedFields = ['first_name', 'last_name', 'phone'];
       const updates = {};
       
-      // Solo permitir campos específicos y no vacíos
+      // Solo permitir campos específicos
       for (const field of allowedFields) {
-        if (updateData[field] !== undefined) {
+        if (updateData[field] !== undefined && updateData[field] !== null) {
           const trimmedValue = updateData[field]?.trim();
-          if (trimmedValue && trimmedValue.length > 0) {
-            updates[field] = trimmedValue;
+          // Permitir valores vacíos para phone, pero no para nombres
+          if (field === 'phone' || (trimmedValue && trimmedValue.length > 0)) {
+            updates[field] = trimmedValue || null;
           }
         }
       }
