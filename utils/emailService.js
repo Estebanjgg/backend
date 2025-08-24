@@ -1,19 +1,44 @@
-const emailjs = require('@emailjs/nodejs');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 /**
- * Servicio para envío de emails usando EmailJS
+ * Servicio para envío de emails usando Nodemailer
  */
 class EmailService {
   constructor() {
-    this.serviceId = process.env.EMAILJS_SERVICE_ID;
-    this.templateId = process.env.EMAILJS_TEMPLATE_ID;
-    this.publicKey = process.env.EMAILJS_PUBLIC_KEY;
-    this.privateKey = process.env.EMAILJS_PRIVATE_KEY;
+    this.smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    this.smtpPort = process.env.SMTP_PORT || 587;
+    this.smtpUser = process.env.SMTP_USER;
+    this.smtpPass = process.env.SMTP_PASS;
+    this.fromEmail = process.env.FROM_EMAIL || this.smtpUser;
     
-    // Verificar que todas las variables estén configuradas
-    if (!this.serviceId || !this.templateId || !this.publicKey) {
-      console.warn('EmailJS: Faltan variables de entorno. Revisa la configuración.');
+    console.log('🔧 SMTP Configuration Status:');
+    console.log('SMTP Host:', this.smtpHost);
+    console.log('SMTP Port:', this.smtpPort);
+    console.log('SMTP User:', this.smtpUser ? '✅ Set' : '❌ Missing');
+    console.log('SMTP Pass:', this.smtpPass ? '✅ Set' : '❌ Missing');
+    console.log('From Email:', this.fromEmail);
+    
+    this.transporter = null;
+    if (this.isConfigured()) {
+      this.createTransporter();
+    }
+  }
+  
+  createTransporter() {
+    try {
+      this.transporter = nodemailer.createTransporter({
+        host: this.smtpHost,
+        port: this.smtpPort,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: this.smtpUser,
+          pass: this.smtpPass
+        }
+      });
+      console.log('✅ Nodemailer transporter created successfully');
+    } catch (error) {
+      console.error('❌ Error creating Nodemailer transporter:', error);
     }
   }
 
@@ -26,37 +51,41 @@ class EmailService {
    */
   async sendPasswordResetEmail(email, resetToken, frontendUrl = process.env.FRONTEND_URL) {
     try {
-      console.log('🔧 EmailJS Config Status:', this.getConfigStatus());
+      if (!this.isConfigured()) {
+        throw new Error('SMTP no está configurado correctamente');
+      }
+      
+      if (!this.transporter) {
+        this.createTransporter();
+      }
       
       const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
       
-      const templateParams = {
-        email: email,
-        link: resetLink,
-        to_email: email // EmailJS usa 'to_email' como campo estándar
+      const mailOptions = {
+        from: this.fromEmail,
+        to: email,
+        subject: 'Recuperación de Contraseña',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Recuperación de Contraseña</h2>
+            <p>Has solicitado restablecer tu contraseña. Haz clic en el siguiente enlace para continuar:</p>
+            <a href="${resetLink}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Restablecer Contraseña</a>
+            <p style="margin-top: 20px; color: #666;">Si no solicitaste este cambio, puedes ignorar este email.</p>
+            <p style="color: #666;">Este enlace expirará en 1 hora.</p>
+          </div>
+        `
       };
 
       console.log('📧 Enviando email de recuperación a:', email);
       console.log('🔗 Link de recuperación:', resetLink);
-      console.log('📋 Template params:', templateParams);
-      console.log('🔑 Service ID:', this.serviceId);
-      console.log('📄 Template ID:', this.templateId);
 
-      const response = await emailjs.send(
-        this.serviceId,
-        this.templateId,
-        templateParams,
-        {
-          publicKey: this.publicKey,
-          privateKey: this.privateKey
-        }
-      );
+      const info = await this.transporter.sendMail(mailOptions);
 
-      console.log('✅ Email enviado exitosamente:', response.status, response.text);
+      console.log('✅ Email enviado exitosamente:', info.messageId);
       return {
         success: true,
-        messageId: response.text,
-        status: response.status
+        messageId: info.messageId,
+        response: info.response
       };
 
     } catch (error) {
@@ -73,7 +102,7 @@ class EmailService {
    * @returns {boolean} True si está configurado
    */
   isConfigured() {
-    return !!(this.serviceId && this.templateId && this.publicKey);
+    return !!(this.smtpUser && this.smtpPass);
   }
 
   /**
@@ -82,10 +111,11 @@ class EmailService {
    */
   getConfigStatus() {
     return {
-      serviceId: !!this.serviceId,
-      templateId: !!this.templateId,
-      publicKey: !!this.publicKey,
-      privateKey: !!this.privateKey,
+      smtpHost: !!this.smtpHost,
+      smtpPort: !!this.smtpPort,
+      smtpUser: !!this.smtpUser,
+      smtpPass: !!this.smtpPass,
+      fromEmail: !!this.fromEmail,
       isFullyConfigured: this.isConfigured()
     };
   }
