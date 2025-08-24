@@ -167,30 +167,35 @@ router.put('/profile', authenticateToken, async (req, res) => {
     const { first_name, last_name, phone } = req.body;
     console.log('Datos recibidos para actualizar perfil:', { first_name, last_name, phone });
 
-    // Validaciones básicas
-    if (first_name && first_name.trim().length < 2) {
+    // Validaciones básicas solo si los campos tienen valor
+    if (first_name && typeof first_name === 'string' && first_name.trim().length < 2) {
       return res.status(400).json({
         success: false,
         message: 'El nombre debe tener al menos 2 caracteres'
       });
     }
 
-    if (last_name && last_name.trim().length < 1) {
+    if (last_name && typeof last_name === 'string' && last_name.trim().length < 1) {
       return res.status(400).json({
         success: false,
         message: 'El apellido no puede estar vacío'
       });
     }
 
-    if (phone && phone.trim().length < 8 && phone.trim().length > 0) {
+    if (phone && typeof phone === 'string' && phone.trim().length > 0 && phone.trim().length < 8) {
       return res.status(400).json({
         success: false,
         message: 'El teléfono debe tener al menos 8 caracteres'
       });
     }
 
-    // Actualizar perfil - pasar todos los campos, incluso si están vacíos
-    const updateData = { first_name, last_name, phone };
+    // Actualizar perfil - preparar los datos correctamente
+    const updateData = {};
+    
+    if (first_name !== undefined) updateData.first_name = first_name;
+    if (last_name !== undefined) updateData.last_name = last_name;
+    if (phone !== undefined) updateData.phone = phone;
+    
     console.log('Datos enviados a updateProfile:', updateData);
     await req.user.updateProfile(updateData);
 
@@ -207,7 +212,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (error.message.includes('No hay campos válidos')) {
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: 'No se proporcionaron campos válidos para actualizar'
       });
     }
     

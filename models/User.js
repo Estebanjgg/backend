@@ -186,21 +186,30 @@ class User {
       
       // Solo permitir campos específicos
       for (const field of allowedFields) {
-        if (updateData[field] !== undefined && updateData[field] !== null) {
-          const trimmedValue = updateData[field]?.trim();
-          console.log(`Procesando campo ${field}: '${updateData[field]}' -> '${trimmedValue}'`);
+        if (updateData.hasOwnProperty(field)) {
+          const value = updateData[field];
+          console.log(`Procesando campo ${field}: '${value}'`);
           
-          // Para phone, permitir valores vacíos (se guarda como null)
-          // Para nombres, requerir que tengan contenido
-          if (field === 'phone') {
-            updates[field] = trimmedValue || null;
-          } else if (trimmedValue && trimmedValue.length > 0) {
-            updates[field] = trimmedValue;
+          // Para todos los campos, permitir valores vacíos pero no undefined/null sin intención
+          if (typeof value === 'string') {
+            const trimmedValue = value.trim();
+            
+            // Para nombres, requerir que tengan contenido si se proporcionan
+            if (field === 'first_name' || field === 'last_name') {
+              if (trimmedValue.length > 0) {
+                updates[field] = trimmedValue;
+              }
+            } else if (field === 'phone') {
+              // Para phone, permitir valores vacíos (se guarda como null o string vacío)
+              updates[field] = trimmedValue.length > 0 ? trimmedValue : null;
+            }
           }
         }
       }
 
       console.log('Updates finales:', updates);
+      
+      // Verificar que al menos haya un campo para actualizar
       if (Object.keys(updates).length === 0) {
         throw new Error('No hay campos válidos para actualizar');
       }
