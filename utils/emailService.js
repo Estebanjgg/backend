@@ -6,7 +6,7 @@ require('dotenv').config();
  */
 class EmailService {
   constructor() {
-    this.smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    this.smtpHost = process.env.SMTP_HOST || 'smtp.mailersend.net';
     this.smtpPort = process.env.SMTP_PORT || 587;
     this.smtpUser = process.env.SMTP_USER;
     this.smtpPass = process.env.SMTP_PASS;
