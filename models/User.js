@@ -180,6 +180,7 @@ class User {
   // Actualizar perfil de usuario
   async updateProfile(updateData) {
     try {
+      console.log('updateProfile recibió:', updateData);
       const allowedFields = ['first_name', 'last_name', 'phone'];
       const updates = {};
       
@@ -187,13 +188,19 @@ class User {
       for (const field of allowedFields) {
         if (updateData[field] !== undefined && updateData[field] !== null) {
           const trimmedValue = updateData[field]?.trim();
-          // Permitir valores vacíos para phone, pero no para nombres
-          if (field === 'phone' || (trimmedValue && trimmedValue.length > 0)) {
+          console.log(`Procesando campo ${field}: '${updateData[field]}' -> '${trimmedValue}'`);
+          
+          // Para phone, permitir valores vacíos (se guarda como null)
+          // Para nombres, requerir que tengan contenido
+          if (field === 'phone') {
             updates[field] = trimmedValue || null;
+          } else if (trimmedValue && trimmedValue.length > 0) {
+            updates[field] = trimmedValue;
           }
         }
       }
 
+      console.log('Updates finales:', updates);
       if (Object.keys(updates).length === 0) {
         throw new Error('No hay campos válidos para actualizar');
       }

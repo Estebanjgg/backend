@@ -165,6 +165,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { first_name, last_name, phone } = req.body;
+    console.log('Datos recibidos para actualizar perfil:', { first_name, last_name, phone });
 
     // Validaciones básicas
     if (first_name && first_name.trim().length < 2) {
@@ -181,15 +182,17 @@ router.put('/profile', authenticateToken, async (req, res) => {
       });
     }
 
-    if (phone && phone.trim().length < 8) {
+    if (phone && phone.trim().length < 8 && phone.trim().length > 0) {
       return res.status(400).json({
         success: false,
         message: 'El teléfono debe tener al menos 8 caracteres'
       });
     }
 
-    // Actualizar perfil
-    await req.user.updateProfile({ first_name, last_name, phone });
+    // Actualizar perfil - pasar todos los campos, incluso si están vacíos
+    const updateData = { first_name, last_name, phone };
+    console.log('Datos enviados a updateProfile:', updateData);
+    await req.user.updateProfile(updateData);
 
     res.json({
       success: true,
