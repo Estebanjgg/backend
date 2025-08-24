@@ -18,12 +18,19 @@ app.use(helmet());
 app.use(morgan('combined'));
 
 // CORS configuration
+// Procesar FRONTEND_URL que puede contener múltiples URLs separadas por comas
+const frontendUrls = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:5173'];
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
+  ...frontendUrls,
   'http://localhost:5174',
   'https://projecto-final-toti-voke-x5vm.vercel.app', // Dominio real de Vercel
   'https://projecto-final-toti-voke.vercel.app' // Dominio alternativo de Vercel
 ];
+
+console.log('🌐 URLs permitidas para CORS:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {

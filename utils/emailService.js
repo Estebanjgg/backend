@@ -59,7 +59,13 @@ class EmailService {
         this.createTransporter();
       }
       
-      const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
+      // Si frontendUrl contiene múltiples URLs separadas por comas, usar la primera (producción)
+      const baseUrl = frontendUrl && frontendUrl.includes(',') 
+        ? frontendUrl.split(',')[0].trim() 
+        : frontendUrl || 'http://localhost:5173';
+      
+      const resetLink = `${baseUrl}/reset-password/${resetToken}`;
+      console.log(`🔗 Enlace de recuperación generado: ${resetLink}`);
       
       const mailOptions = {
         from: this.fromEmail,
