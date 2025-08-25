@@ -58,17 +58,34 @@ const authenticateToken = async (req, res, next) => {
 // Middleware opcional de autenticación (no falla si no hay token)
 const optionalAuth = async (req, res, next) => {
   try {
+    console.log('🔍 === OPTIONAL AUTH DEBUG ===');
+    console.log('🔍 Headers recibidos:', {
+      'authorization': req.headers['authorization'],
+      'x-session-id': req.headers['x-session-id'],
+      'user-agent': req.headers['user-agent']?.substring(0, 50) + '...'
+    });
+    
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+    
+    console.log('🔍 Token extraído:', token ? token.substring(0, 20) + '...' : 'null');
 
     if (token) {
+      console.log('🔍 Verificando token...');
       const decoded = User.verifyToken(token);
+      console.log('🔍 Token decodificado:', decoded ? { id: decoded.id, email: decoded.email } : 'null');
+      
       if (decoded) {
         const user = await User.findById(decoded.id);
+        console.log('🔍 Usuario encontrado:', user ? { id: user.id, email: user.email } : 'null');
+        
         if (user) {
           req.user = user;
+          console.log('✅ Usuario autenticado en optionalAuth');
         }
       }
+    } else {
+      console.log('ℹ️ No hay token, continuando como usuario anónimo');
     }
 
     next();
