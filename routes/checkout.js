@@ -104,11 +104,63 @@ router.post('/validate', async (req, res) => {
     // Verificar que el carrito no esté vacío
     const cartItems = await Cart.getCart(req.userId, req.sessionId);
     
-    // Debug logs para diagnóstico
+    // Debug logs para diagnóstico completo
     console.log('🔍 Debug checkout validation:');
     console.log('  - userId:', req.userId);
     console.log('  - sessionId:', req.sessionId);
-    console.log('  - cartItems count:', cartItems ? cartItems.length : 0);
+    console.log('  - req.headers:', {
+      'user-agent': req.headers['user-agent'],
+      'origin': req.headers.origin,
+      'authorization': req.headers.authorization ? 'present' : 'missing'
+    });
+    
+    // Vamos a verificar directamente en la base de datos qué hay
+    const supabase = require('../config/supabase');
+    console.log('  - Consultando directamente la DB...');
+    
+    // Consulta para usuario
+    if (req.userId) {
+      const { data: userCart, error: userError } = await supabase
+        .from('cart_items')
+        .select('*')
+        .eq('user_id', req.userId);
+      console.log('  - Items por userId:', userCart ? userCart.length : 0, userError ? userError.message : 'OK');
+    }
+    
+    // Consulta para sesión
+    if (req.sessionId) {
+      const { data: sessionCart, error: sessionError } = await supabase
+        .from('cart_items')
+        .select('*')
+        .eq('session_id', req.sessionId);
+      console.log('  - Items por sessionId:', sessionCart ? sessionCart.length : 0, sessionError ? sessionError.message : 'OK');
+      if (sessionCart && sessionCart.length > 0) {
+        console.log('  - Detalles de items encontrados:', sessionCart.map(item => ({
+          id: item.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          user_id: item.user_id,
+          session_id: item.session_id
+        })));
+      }
+    }
+    
+    // Consulta general para ver todos los items del carrito
+    const { data: allCart, error: allError } = await supabase
+      .from('cart_items')
+      .select('*')
+      .limit(10);
+    console.log('  - Total items en cart_items (muestra):', allCart ? allCart.length : 0);
+    if (allCart && allCart.length > 0) {
+      console.log('  - Muestra de todos los items:', allCart.map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        session_id: item.session_id,
+        product_id: item.product_id
+      })));
+    }
+    
+    console.log('  - cartItems del método Cart.getCart:', cartItems ? cartItems.length : 0);
     if (cartItems && cartItems.length > 0) {
       console.log('  - cartItems preview:', cartItems.map(item => ({
         id: item.id,
