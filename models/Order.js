@@ -97,6 +97,12 @@ class Order {
       // Crear la orden
       const orderNumber = this.generateOrderNumber();
       
+      // Debug: mostrar con qué valores se va a crear la orden
+      console.log('🔧 Debug Order creation:');
+      console.log('  - userId pasado:', userId);
+      console.log('  - sessionId pasado:', sessionId);
+      console.log('  - orderNumber generado:', orderNumber);
+      
       const newOrder = {
         user_id: userId,
         session_id: sessionId,
@@ -139,6 +145,13 @@ class Order {
         console.error('Error creando orden:', orderError);
         throw orderError;
       }
+
+      // Debug: mostrar orden creada
+      console.log('✅ Orden creada exitosamente:');
+      console.log('  - order.id:', order.id);
+      console.log('  - order.user_id:', order.user_id);
+      console.log('  - order.session_id:', order.session_id);
+      console.log('  - order.order_number:', order.order_number);
 
       // Crear items de la orden
       const orderItems = cartItems.map(item => {
@@ -228,6 +241,12 @@ class Order {
   // Obtener orden por ID
   static async getById(orderId, userId = null, sessionId = null) {
     try {
+      // Debug: mostrar qué estamos buscando
+      console.log('🔍 Debug Order.getById:');
+      console.log('  - orderId:', orderId);
+      console.log('  - userId:', userId);
+      console.log('  - sessionId:', sessionId);
+      
       // Primero obtener la orden básica
       let query = supabase
         .from('orders')
@@ -236,15 +255,36 @@ class Order {
 
       // Filtrar por usuario o sesión si se proporciona
       if (userId) {
+        console.log('  - Filtrando por userId');
         query = query.eq('user_id', userId);
       } else if (sessionId) {
+        console.log('  - Filtrando por sessionId');
         query = query.eq('session_id', sessionId);
+      } else {
+        console.log('  - Sin filtros adicionales (solo orderId)');
       }
 
       const { data: order, error: orderError } = await query.single();
 
       if (orderError) {
         console.error('Error obteniendo orden:', orderError);
+        
+        // Intentemos buscar la orden sin filtros para ver si existe
+        console.log('  - Intentando buscar orden sin filtros...');
+        const { data: orderWithoutFilters, error: noFilterError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+          
+        if (noFilterError) {
+          console.log('  - Orden no existe en absoluto:', noFilterError.message);
+        } else {
+          console.log('  - Orden SÍ existe pero con filtros RLS diferentes:');
+          console.log('    - order.user_id:', orderWithoutFilters.user_id);
+          console.log('    - order.session_id:', orderWithoutFilters.session_id);
+        }
+        
         throw orderError;
       }
 

@@ -1,12 +1,19 @@
 -- Arreglar políticas RLS para órdenes
 -- Este script permite a usuarios anónimos con session_id crear órdenes
 
--- Eliminar políticas existentes
+-- Eliminar políticas existentes (incluir las nuevas que podrían existir)
 DROP POLICY IF EXISTS "Users can view their own orders" ON orders;
 DROP POLICY IF EXISTS "Users can create orders" ON orders;
 DROP POLICY IF EXISTS "Users can update their own orders" ON orders;
 DROP POLICY IF EXISTS "Users can view their order items" ON order_items;
 DROP POLICY IF EXISTS "Users can create order items" ON order_items;
+
+-- Eliminar políticas nuevas si existen
+DROP POLICY IF EXISTS "orders_select_policy" ON orders;
+DROP POLICY IF EXISTS "orders_insert_policy" ON orders;
+DROP POLICY IF EXISTS "orders_update_policy" ON orders;
+DROP POLICY IF EXISTS "order_items_select_policy" ON order_items;
+DROP POLICY IF EXISTS "order_items_insert_policy" ON order_items;
 
 -- Crear nuevas políticas más permisivas para órdenes
 
