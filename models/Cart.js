@@ -34,9 +34,58 @@ class Cart {
         `);
 
       if (userId) {
+        // Si tenemos userId, buscar solo por user_id
         query = query.eq('user_id', userId);
       } else if (sessionId) {
-        query = query.eq('session_id', sessionId);
+        // Si no hay userId pero hay sessionId, buscar por session_id
+        // PERO también incluir items que podrían tener user_id pero session_id null
+        // (caso de usuarios que se loguearon después de agregar al carrito)
+        
+        // Primero intentamos buscar por session_id
+        const { data: sessionData, error: sessionError } = await query
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: false });
+
+        if (sessionError) {
+          console.error('Error obteniendo carrito por sessionId:', sessionError);
+          throw sessionError;
+        }
+
+        // Si encontramos items por sessionId, los devolvemos
+        if (sessionData && sessionData.length > 0) {
+          return sessionData;
+        }
+
+        // Si no encontramos por sessionId, busquemos si hay items huérfanos con user_id pero sin session_id
+        // Esto puede pasar cuando el usuario se loguea después de agregar al carrito
+        const { data: orphanData, error: orphanError } = await supabase
+          .from('cart_items')
+          .select(`
+            *,
+            products (
+              id,
+              title,
+              brand,
+              category,
+              current_price,
+              original_price,
+              discount,
+              image,
+              stock,
+              is_active
+            )
+          `)
+          .not('user_id', 'is', null)
+          .is('session_id', null)
+          .order('created_at', { ascending: false });
+
+        if (orphanError) {
+          console.error('Error obteniendo carrito huérfano:', orphanError);
+          // No lanzamos error aquí, solo retornamos array vacío
+          return [];
+        }
+
+        return orphanData || [];
       } else {
         throw new Error('Se requiere user_id o session_id');
       }
