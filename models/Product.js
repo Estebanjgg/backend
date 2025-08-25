@@ -158,7 +158,7 @@ class Product {
 
   // Métodos estáticos para interactuar con la base de datos
   static async findAll(options = {}) {
-    const { supabase } = require('../config/supabase');
+    const supabase = require('../config/supabase');
     const {
       page = 1,
       limit = 20,
@@ -224,7 +224,7 @@ class Product {
   }
 
   static async findById(id) {
-    const { supabase } = require('../config/supabase');
+    const supabase = require('../config/supabase');
     
     try {
       const { data, error } = await supabase
@@ -245,7 +245,7 @@ class Product {
   }
 
   static async create(productData) {
-    const { supabase } = require('../config/supabase');
+    const supabase = require('../config/supabase');
     
     try {
       // Crear instancia del producto para validación
@@ -269,7 +269,7 @@ class Product {
   }
 
   static async update(id, updateData) {
-    const { supabase } = require('../config/supabase');
+    const supabase = require('../config/supabase');
     
     try {
       // Obtener producto existente
@@ -300,7 +300,7 @@ class Product {
   }
 
   static async delete(id) {
-    const { supabase } = require('../config/supabase');
+    const supabase = require('../config/supabase');
     
     try {
       const { error } = await supabase
