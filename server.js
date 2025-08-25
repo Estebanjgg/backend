@@ -13,6 +13,7 @@ const checkoutRoutes = require('./routes/checkout');
 const adminRoutes = require('./routes/admin');
 const paymentsRoutes = require('./routes/payments');
 const ordersRoutes = require('./routes/orders');
+const debugRoutes = require('./routes/debug');
 const { setupSwagger } = require('./config/swagger');
 
 const app = express();
@@ -87,6 +88,7 @@ app.use('/api/checkout', checkoutRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

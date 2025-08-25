@@ -228,20 +228,10 @@ class Order {
   // Obtener orden por ID
   static async getById(orderId, userId = null, sessionId = null) {
     try {
+      // Primero obtener la orden básica
       let query = supabase
         .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            products (
-              title,
-              image,
-              brand,
-              category
-            )
-          )
-        `)
+        .select('*')
         .eq('id', orderId);
 
       // Filtrar por usuario o sesión si se proporciona
@@ -251,20 +241,67 @@ class Order {
         query = query.eq('session_id', sessionId);
       }
 
-      const { data, error } = await query.single();
+      const { data: order, error: orderError } = await query.single();
 
-      if (error) {
-        console.error('Error obteniendo orden:', error);
-        throw error;
+      if (orderError) {
+        console.error('Error obteniendo orden:', orderError);
+        throw orderError;
       }
 
-      if (data) {
-        // Parsear direcciones JSON
-        data.shipping_address = JSON.parse(data.shipping_address || '{}');
-        data.billing_address = JSON.parse(data.billing_address || '{}');
+      if (!order) {
+        return null;
       }
 
-      return data;
+      // Obtener los items de la orden por separado
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
+
+      if (itemsError) {
+        console.error('Error obteniendo items de orden:', itemsError);
+        // No lanzar error aquí, solo devolver orden sin items
+        order.order_items = [];
+      } else {
+        // Si tenemos items, intentar obtener detalles de productos por separado
+        const enrichedItems = [];
+        
+        for (const item of orderItems || []) {
+          // Intentar obtener detalles del producto actual
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('title, image, brand, category')
+            .eq('id', item.product_id)
+            .single();
+
+          // Agregar item con o sin detalles de producto
+          enrichedItems.push({
+            ...item,
+            products: productError ? null : product
+          });
+        }
+        
+        order.order_items = enrichedItems;
+      }
+
+      // Parsear direcciones JSON
+      if (order.shipping_address) {
+        try {
+          order.shipping_address = JSON.parse(order.shipping_address);
+        } catch (e) {
+          order.shipping_address = {};
+        }
+      }
+      
+      if (order.billing_address) {
+        try {
+          order.billing_address = JSON.parse(order.billing_address);
+        } catch (e) {
+          order.billing_address = {};
+        }
+      }
+
+      return order;
     } catch (error) {
       console.error('Error en getById:', error);
       throw error;
@@ -274,20 +311,10 @@ class Order {
   // Obtener orden por número de orden
   static async getByOrderNumber(orderNumber, userId = null, sessionId = null) {
     try {
+      // Primero obtener la orden básica
       let query = supabase
         .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            products (
-              title,
-              image,
-              brand,
-              category
-            )
-          )
-        `)
+        .select('*')
         .eq('order_number', orderNumber);
 
       if (userId) {
@@ -296,19 +323,64 @@ class Order {
         query = query.eq('session_id', sessionId);
       }
 
-      const { data, error } = await query.single();
+      const { data: order, error: orderError } = await query.single();
 
-      if (error) {
-        console.error('Error obteniendo orden:', error);
-        throw error;
+      if (orderError) {
+        console.error('Error obteniendo orden:', orderError);
+        throw orderError;
       }
 
-      if (data) {
-        data.shipping_address = JSON.parse(data.shipping_address || '{}');
-        data.billing_address = JSON.parse(data.billing_address || '{}');
+      if (!order) {
+        return null;
       }
 
-      return data;
+      // Obtener los items de la orden por separado
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+
+      if (itemsError) {
+        console.error('Error obteniendo items de orden:', itemsError);
+        order.order_items = [];
+      } else {
+        // Enriquecer items con detalles de productos
+        const enrichedItems = [];
+        
+        for (const item of orderItems || []) {
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('title, image, brand, category')
+            .eq('id', item.product_id)
+            .single();
+
+          enrichedItems.push({
+            ...item,
+            products: productError ? null : product
+          });
+        }
+        
+        order.order_items = enrichedItems;
+      }
+
+      // Parsear direcciones JSON
+      if (order.shipping_address) {
+        try {
+          order.shipping_address = JSON.parse(order.shipping_address);
+        } catch (e) {
+          order.shipping_address = {};
+        }
+      }
+      
+      if (order.billing_address) {
+        try {
+          order.billing_address = JSON.parse(order.billing_address);
+        } catch (e) {
+          order.billing_address = {};
+        }
+      }
+
+      return order;
     } catch (error) {
       console.error('Error en getByOrderNumber:', error);
       throw error;
