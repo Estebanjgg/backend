@@ -99,30 +99,30 @@ const paymentSchema = Joi.object({
   order_id: Joi.number().integer().required(),
   payment_method: Joi.string().valid('credit_card', 'debit_card', 'pix', 'boleto').required(),
   payment_data: Joi.object({
-    cardNumber: Joi.when('$payment_method', {
+    cardNumber: Joi.when('...payment_method', {
       is: Joi.valid('credit_card', 'debit_card'),
       then: Joi.string().required(),
-      otherwise: Joi.forbidden()
+      otherwise: Joi.optional()
     }),
-    expiryDate: Joi.when('$payment_method', {
+    expiryDate: Joi.when('...payment_method', {
       is: Joi.valid('credit_card', 'debit_card'),
       then: Joi.string().required(),
-      otherwise: Joi.forbidden()
+      otherwise: Joi.optional()
     }),
-    cvv: Joi.when('$payment_method', {
+    cvv: Joi.when('...payment_method', {
       is: Joi.valid('credit_card', 'debit_card'),
       then: Joi.string().required(),
-      otherwise: Joi.forbidden()
+      otherwise: Joi.optional()
     }),
-    cardName: Joi.when('$payment_method', {
+    cardName: Joi.when('...payment_method', {
       is: Joi.valid('credit_card', 'debit_card'),
       then: Joi.string().required(),
-      otherwise: Joi.forbidden()
+      otherwise: Joi.optional()
     }),
-    installments: Joi.when('$payment_method', {
+    installments: Joi.when('...payment_method', {
       is: 'credit_card',
       then: Joi.number().integer().min(1).max(12).default(1),
-      otherwise: Joi.forbidden()
+      otherwise: Joi.optional()
     })
   }).optional()
 }).external(async (value) => {
@@ -146,6 +146,8 @@ router.post('/process', async (req, res) => {
       ...req.body,
       userId: req.userId,
       sessionId: req.sessionId
+    }, {
+      context: { payment_method: req.body.payment_method }
     });
     
     if (error) {
