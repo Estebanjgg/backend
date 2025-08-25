@@ -160,27 +160,16 @@ const paymentSchema = Joi.object({
 // POST /api/payments/process - Procesar pago
 router.post('/process', async (req, res) => {
   try {
-    const { error, value } = await paymentSchema.validateAsync({
+    const validationResult = await paymentSchema.validateAsync({
       ...req.body,
       userId: req.userId,
       sessionId: req.sessionId
     }, {
       context: { payment_method: req.body.payment_method }
     });
-    
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Datos de pago inválidos',
-        errors: error.details.map(detail => ({
-          field: detail.path.join('.'),
-          message: detail.message
-        }))
-      });
-    }
 
-    const { order_id, payment_method, payment_data } = value;
-    const order = value.order;
+    const { order_id, payment_method, payment_data } = validationResult;
+    const order = validationResult.order;
     
     let paymentResult;
     
@@ -252,14 +241,36 @@ router.post('/process', async (req, res) => {
       });
     }
     
-  } catch (error) {
-    console.error('Error procesando pago:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor',
-      error: error.message
-    });
-  }
+    } catch (error) {
+      console.error('Error procesando pago:', error);
+      
+      // Manejar errores de validación específicamente
+      if (error.isJoi) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos de pago inválidos',
+          errors: error.details.map(detail => ({
+            field: detail.path.join('.'),
+            message: detail.message
+          }))
+        });
+      }
+      
+      // Manejar errores de orden no encontrada
+      if (error.message.includes('Orden no encontrada') || 
+          error.message.includes('ya fue procesada')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
 });
 
 // POST /api/payments/pix/:transactionId/confirm - Simular confirmación de PIX
