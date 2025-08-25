@@ -3,25 +3,36 @@ const User = require('../models/User');
 // Middleware para verificar si el usuario es administrador
 const requireAdmin = async (req, res, next) => {
   try {
+    console.log('🔐 === VERIFICANDO ACCESO ADMIN (BACKEND) ===');
+    console.log('🔐 req.user:', req.user ? JSON.stringify(req.user, null, 2) : 'null');
+    console.log('🔐 Headers Authorization:', req.headers.authorization);
+    
     // Verificar que el usuario esté autenticado
     if (!req.user) {
+      console.log('❌ BACKEND: Usuario no autenticado');
       return res.status(401).json({
         success: false,
         message: 'Acceso no autorizado. Se requiere autenticación.'
       });
     }
 
+    console.log('👤 BACKEND: Usuario autenticado - ID:', req.user.id);
+    console.log('📧 BACKEND: Email:', req.user.email);
+    console.log('🔑 BACKEND: Rol actual:', req.user.role);
+    
     // Verificar que el usuario tenga rol de admin
     if (req.user.role !== 'admin') {
+      console.log('❌ BACKEND: Usuario no es admin - Rol:', req.user.role);
       return res.status(403).json({
         success: false,
         message: 'Acceso denegado. Se requieren privilegios de administrador.'
       });
     }
 
+    console.log('✅ BACKEND: Acceso admin concedido');
     next();
   } catch (error) {
-    console.error('Error en requireAdmin:', error);
+    console.error('💥 BACKEND: Error en requireAdmin:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

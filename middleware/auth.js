@@ -4,10 +4,14 @@ const jwt = require('jsonwebtoken');
 // Middleware para verificar autenticación JWT
 const authenticateToken = async (req, res, next) => {
   try {
+    console.log('🔑 === VERIFICANDO TOKEN (BACKEND) ===');
     const authHeader = req.headers['authorization'];
+    console.log('🔑 Auth Header:', authHeader);
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    console.log('🔑 Token extraído:', token ? token.substring(0, 20) + '...' : 'null');
 
     if (!token) {
+      console.log('❌ BACKEND: No hay token');
       return res.status(401).json({
         success: false,
         message: 'Token de acceso requerido'
@@ -15,8 +19,11 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verificar token
+    console.log('🔍 BACKEND: Verificando token...');
     const decoded = User.verifyToken(token);
+    console.log('🔍 BACKEND: Token decodificado:', decoded);
     if (!decoded) {
+      console.log('❌ BACKEND: Token inválido');
       return res.status(403).json({
         success: false,
         message: 'Token inválido o expirado'
@@ -24,8 +31,11 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Buscar usuario en la base de datos
+    console.log('👤 BACKEND: Buscando usuario con ID:', decoded.id);
     const user = await User.findById(decoded.id);
+    console.log('👤 BACKEND: Usuario encontrado:', user ? { id: user.id, email: user.email, role: user.role } : 'null');
     if (!user) {
+      console.log('❌ BACKEND: Usuario no encontrado en BD');
       return res.status(403).json({
         success: false,
         message: 'Usuario no encontrado'
@@ -34,9 +44,10 @@ const authenticateToken = async (req, res, next) => {
 
     // Agregar usuario a la request
     req.user = user;
+    console.log('✅ BACKEND: Usuario autenticado correctamente');
     next();
   } catch (error) {
-    console.error('Error en authenticateToken:', error);
+    console.error('💥 BACKEND: Error en authenticateToken:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
