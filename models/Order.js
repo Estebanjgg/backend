@@ -142,23 +142,16 @@ class Order {
 
       // Crear items de la orden
       const orderItems = cartItems.map(item => {
-        // Asegurar que product_id sea un número entero
-        let productId = item.product_id;
-        if (typeof productId === 'string' && productId.includes('-')) {
-          // Si es un UUID, necesitamos obtener el ID numérico del producto
-          console.warn('Warning: product_id es UUID, necesita conversión:', productId);
-          // Por ahora, intentaremos usar el ID del producto relacionado
-          productId = item.products?.id || item.product_id;
-        }
+        // Usar product_id directamente ya que ahora ambos son UUIDs
+        const productId = item.product_id || item.products?.id;
         
-        // Convertir a número entero si es string numérico
-        if (typeof productId === 'string' && !productId.includes('-')) {
-          productId = parseInt(productId);
+        if (!productId) {
+          throw new Error(`Product ID no encontrado para item: ${JSON.stringify(item)}`);
         }
         
         return {
           order_id: order.id,
-          product_id: productId,
+          product_id: productId, // Ahora es UUID tanto en origen como destino
           quantity: item.quantity,
           unit_price: item.price,
           total_price: item.price * item.quantity,
