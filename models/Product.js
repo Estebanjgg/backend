@@ -155,6 +155,169 @@ class Product {
   static getConditions() {
     return ['Novo', 'Seminovo', 'Usado', 'Recondicionado'];
   }
+
+  // Métodos estáticos para interactuar con la base de datos
+  static async findAll(options = {}) {
+    const { supabase } = require('../config/database');
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      brand,
+      search,
+      sortBy = 'created_at',
+      sortOrder = 'desc',
+      inStock
+    } = options;
+
+    try {
+      const offset = (page - 1) * limit;
+      
+      let query = supabase
+        .from('products')
+        .select('*', { count: 'exact' });
+
+      // Aplicar filtros
+      if (category) {
+        query = query.eq('category', category);
+      }
+      
+      if (brand) {
+        query = query.eq('brand', brand);
+      }
+      
+      if (search) {
+        query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,brand.ilike.%${search}%`);
+      }
+      
+      if (inStock === 'true') {
+        query = query.gt('stock', 0);
+      } else if (inStock === 'false') {
+        query = query.eq('stock', 0);
+      }
+
+      // Aplicar ordenamiento
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+      
+      // Aplicar paginación
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        products: data || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error en Product.findAll:', error);
+      throw error;
+    }
+  }
+
+  static async findById(id) {
+    const { supabase } = require('../config/database');
+    
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error en Product.findById:', error);
+      throw error;
+    }
+  }
+
+  static async create(productData) {
+    const { supabase } = require('../config/database');
+    
+    try {
+      // Crear instancia del producto para validación
+      const product = new Product(productData);
+      
+      const { data, error } = await supabase
+        .from('products')
+        .insert([product.toJSON()])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error en Product.create:', error);
+      throw error;
+    }
+  }
+
+  static async update(id, updateData) {
+    const { supabase } = require('../config/database');
+    
+    try {
+      // Obtener producto existente
+      const existingProduct = await this.findById(id);
+      if (!existingProduct) {
+        throw new Error('Producto no encontrado');
+      }
+
+      // Crear instancia del producto con datos actualizados para validación
+      const updatedProduct = new Product({ ...existingProduct, ...updateData });
+      
+      const { data, error } = await supabase
+        .from('products')
+        .update(updatedProduct.toJSON())
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error en Product.update:', error);
+      throw error;
+    }
+  }
+
+  static async delete(id) {
+    const { supabase } = require('../config/database');
+    
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error en Product.delete:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = Product;
