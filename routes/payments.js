@@ -124,7 +124,11 @@ const paymentSchema = Joi.object({
       then: Joi.number().integer().min(1).max(12).default(1),
       otherwise: Joi.optional()
     })
-  }).optional()
+  }).optional(),
+  
+  // Permitir campos de autenticación
+  userId: Joi.string().allow(null).optional(),
+  sessionId: Joi.string().allow(null).optional()
 }).external(async (value) => {
   // Verificar que la orden existe y pertenece al usuario
   const order = await Order.getById(value.order_id, value.userId, value.sessionId);
