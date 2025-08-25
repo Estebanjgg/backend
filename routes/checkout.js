@@ -104,6 +104,19 @@ router.post('/validate', async (req, res) => {
     // Verificar que el carrito no esté vacío
     const cartItems = await Cart.getCart(req.userId, req.sessionId);
     
+    // Debug logs para diagnóstico
+    console.log('🔍 Debug checkout validation:');
+    console.log('  - userId:', req.userId);
+    console.log('  - sessionId:', req.sessionId);
+    console.log('  - cartItems count:', cartItems ? cartItems.length : 0);
+    if (cartItems && cartItems.length > 0) {
+      console.log('  - cartItems preview:', cartItems.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity: item.quantity
+      })));
+    }
+    
     if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
