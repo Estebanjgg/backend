@@ -57,6 +57,9 @@ class Order {
         throw new Error('El carrito está vacío');
       }
 
+      // Debug: Mostrar estructura de items del carrito
+      console.log('🛒 Items del carrito:', JSON.stringify(cartItems[0], null, 2));
+
       // Verificar stock disponible para todos los productos
       for (const item of cartItems) {
         const { data: product, error } = await supabase
@@ -138,17 +141,33 @@ class Order {
       }
 
       // Crear items de la orden
-      const orderItems = cartItems.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-        product_title: item.products?.title,
-        product_image: item.products?.image,
-        product_brand: item.products?.brand,
-        created_at: new Date().toISOString()
-      }));
+      const orderItems = cartItems.map(item => {
+        // Asegurar que product_id sea un número entero
+        let productId = item.product_id;
+        if (typeof productId === 'string' && productId.includes('-')) {
+          // Si es un UUID, necesitamos obtener el ID numérico del producto
+          console.warn('Warning: product_id es UUID, necesita conversión:', productId);
+          // Por ahora, intentaremos usar el ID del producto relacionado
+          productId = item.products?.id || item.product_id;
+        }
+        
+        // Convertir a número entero si es string numérico
+        if (typeof productId === 'string' && !productId.includes('-')) {
+          productId = parseInt(productId);
+        }
+        
+        return {
+          order_id: order.id,
+          product_id: productId,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          product_title: item.products?.title || 'Producto sin nombre',
+          product_image: item.products?.image || item.products?.image_url,
+          product_brand: item.products?.brand,
+          created_at: new Date().toISOString()
+        };
+      });
 
       const { data: orderItemsData, error: itemsError } = await supabase
         .from('order_items')
