@@ -10,6 +10,7 @@ const cartRoutes = require('./routes/cart');
 const authRoutes = require('./routes/auth');
 const favoriteRoutes = require('./routes/favorites');
 const checkoutRoutes = require('./routes/checkout');
+const adminRoutes = require('./routes/admin');
 const { setupSwagger } = require('./config/swagger');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/checkout', checkoutRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

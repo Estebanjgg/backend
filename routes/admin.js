@@ -1,0 +1,605 @@
+const express = require('express');
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const User = require('../models/User');
+const supabase = require('../config/supabase');
+const { authenticateToken } = require('../middleware/auth');
+const { requireAdmin, requireAdminPermission, logAdminAction } = require('../middleware/adminAuth');
+const Joi = require('joi');
+const router = express.Router();
+
+// Aplicar middleware de autenticación a todas las rutas
+router.use(authenticateToken);
+router.use(requireAdmin);
+
+// ===== GESTIÓN DE ÓRDENES =====
+
+// GET /api/admin/orders - Obtener todas las órdenes con filtros
+router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      payment_status,
+      start_date,
+      end_date,
+      search,
+      sort_by = 'created_at',
+      sort_order = 'desc'
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Construir query base
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items(*)
+      `);
+
+    // Aplicar filtros
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    if (payment_status) {
+      query = query.eq('payment_status', payment_status);
+    }
+    
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+    
+    if (end_date) {
+      query = query.lte('created_at', end_date);
+    }
+    
+    if (search) {
+      query = query.or(`order_number.ilike.%${search}%,customer_email.ilike.%${search}%,customer_name.ilike.%${search}%`);
+    }
+
+    // Aplicar ordenamiento
+    query = query.order(sort_by, { ascending: sort_order === 'asc' });
+    
+    // Aplicar paginación
+    query = query.range(offset, offset + parseInt(limit) - 1);
+
+    const { data: orders, error, count } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data: orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo órdenes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/admin/orders/:id - Obtener orden específica
+router.get('/orders/:id', requireAdminPermission('manage_orders'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findById(id);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error('Error obteniendo orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// PUT /api/admin/orders/:id/status - Actualizar estado de orden
+router.put('/orders/:id/status', 
+  requireAdminPermission('manage_orders'),
+  logAdminAction('update_order_status'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, notes } = req.body;
+
+      // Validar estado
+      const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Estado de orden inválido'
+        });
+      }
+
+      const order = await Order.findById(id);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Orden no encontrada'
+        });
+      }
+
+      // Actualizar orden
+      const updatedOrder = await Order.updateStatus(id, status, notes);
+
+      res.json({
+        success: true,
+        message: 'Estado de orden actualizado exitosamente',
+        data: updatedOrder
+      });
+    } catch (error) {
+      console.error('Error actualizando estado de orden:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// PUT /api/admin/orders/:id/payment-status - Actualizar estado de pago
+router.put('/orders/:id/payment-status',
+  requireAdminPermission('manage_orders'),
+  logAdminAction('update_payment_status'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { payment_status } = req.body;
+
+      // Validar estado de pago
+      const validPaymentStatuses = ['pending', 'processing', 'completed', 'failed', 'refunded'];
+      if (!validPaymentStatuses.includes(payment_status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Estado de pago inválido'
+        });
+      }
+
+      const order = await Order.findById(id);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Orden no encontrada'
+        });
+      }
+
+      // Actualizar estado de pago
+      const updatedOrder = await Order.updatePaymentStatus(id, payment_status);
+
+      res.json({
+        success: true,
+        message: 'Estado de pago actualizado exitosamente',
+        data: updatedOrder
+      });
+    } catch (error) {
+      console.error('Error actualizando estado de pago:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// GET /api/admin/orders/stats - Obtener estadísticas de órdenes
+router.get('/orders/stats', requireAdminPermission('view_analytics'), async (req, res) => {
+  try {
+    const { period = '30d' } = req.query;
+    
+    // Calcular fecha de inicio según el período
+    let startDate = new Date();
+    switch (period) {
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90d':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case '1y':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+
+    const stats = await Order.getOrderStats(startDate.toISOString());
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// ===== GESTIÓN DE PRODUCTOS =====
+
+// GET /api/admin/products - Obtener todos los productos con filtros
+router.get('/products', requireAdminPermission('manage_products'), async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      brand,
+      search,
+      sort_by = 'created_at',
+      sort_order = 'desc',
+      in_stock
+    } = req.query;
+
+    const products = await Product.findAll({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      category,
+      brand,
+      search,
+      sortBy: sort_by,
+      sortOrder: sort_order,
+      inStock: in_stock
+    });
+
+    res.json({
+      success: true,
+      data: products.products,
+      pagination: products.pagination
+    });
+  } catch (error) {
+    console.error('Error obteniendo productos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/admin/products - Crear nuevo producto
+router.post('/products',
+  requireAdminPermission('manage_products'),
+  logAdminAction('create_product'),
+  async (req, res) => {
+    try {
+      const productData = req.body;
+      
+      // Validar datos del producto
+      const schema = Joi.object({
+        title: Joi.string().required().min(3).max(200),
+        description: Joi.string().required().min(10),
+        price: Joi.number().required().min(0),
+        category: Joi.string().required(),
+        brand: Joi.string().required(),
+        image: Joi.string().uri().required(),
+        stock: Joi.number().integer().min(0).default(0),
+        is_featured: Joi.boolean().default(false),
+        is_active: Joi.boolean().default(true)
+      });
+
+      const { error, value } = schema.validate(productData);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos de producto inválidos',
+          errors: error.details
+        });
+      }
+
+      const product = await Product.create(value);
+
+      res.status(201).json({
+        success: true,
+        message: 'Producto creado exitosamente',
+        data: product
+      });
+    } catch (error) {
+      console.error('Error creando producto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// PUT /api/admin/products/:id - Actualizar producto
+router.put('/products/:id',
+  requireAdminPermission('manage_products'),
+  logAdminAction('update_product'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      const product = await Product.findById(id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      const updatedProduct = await Product.update(id, updateData);
+
+      res.json({
+        success: true,
+        message: 'Producto actualizado exitosamente',
+        data: updatedProduct
+      });
+    } catch (error) {
+      console.error('Error actualizando producto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// DELETE /api/admin/products/:id - Eliminar producto
+router.delete('/products/:id',
+  requireAdminPermission('manage_products'),
+  logAdminAction('delete_product'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const product = await Product.findById(id);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Producto no encontrado'
+        });
+      }
+
+      await Product.delete(id);
+
+      res.json({
+        success: true,
+        message: 'Producto eliminado exitosamente'
+      });
+    } catch (error) {
+      console.error('Error eliminando producto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ===== GESTIÓN DE USUARIOS =====
+
+// GET /api/admin/users - Obtener todos los usuarios
+router.get('/users', requireAdminPermission('manage_users'), async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      role,
+      is_active
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    let query = supabase
+      .from('users')
+      .select('id, email, first_name, last_name, phone, role, is_active, email_verified, created_at, last_login', { count: 'exact' });
+
+    // Aplicar filtros
+    if (search) {
+      query = query.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+    }
+    
+    if (role) {
+      query = query.eq('role', role);
+    }
+    
+    if (is_active !== undefined) {
+      query = query.eq('is_active', is_active === 'true');
+    }
+
+    // Aplicar paginación
+    query = query.range(offset, offset + parseInt(limit) - 1);
+    query = query.order('created_at', { ascending: false });
+
+    const { data: users, error, count } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data: users,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo usuarios:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// PUT /api/admin/users/:id/role - Actualizar rol de usuario
+router.put('/users/:id/role',
+  requireAdminPermission('manage_users'),
+  logAdminAction('update_user_role'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+
+      // Validar rol
+      const validRoles = ['user', 'admin', 'moderator'];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rol inválido'
+        });
+      }
+
+      // No permitir que un admin se quite sus propios privilegios
+      if (id === req.user.id && role !== 'admin') {
+        return res.status(400).json({
+          success: false,
+          message: 'No puedes cambiar tu propio rol de administrador'
+        });
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .update({ role, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Rol de usuario actualizado exitosamente',
+        data: {
+          id: data.id,
+          email: data.email,
+          role: data.role
+        }
+      });
+    } catch (error) {
+      console.error('Error actualizando rol de usuario:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ===== DASHBOARD Y ANALYTICS =====
+
+// GET /api/admin/dashboard - Obtener datos del dashboard
+router.get('/dashboard', requireAdminPermission('view_analytics'), async (req, res) => {
+  try {
+    // Obtener estadísticas generales
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    // Estadísticas de órdenes
+    const orderStats = await Order.getOrderStats(thirtyDaysAgo.toISOString());
+    
+    // Estadísticas de usuarios
+    const { data: userStats, error: userError } = await supabase
+      .from('users')
+      .select('role, is_active, created_at')
+      .gte('created_at', thirtyDaysAgo.toISOString());
+
+    if (userError) {
+      throw userError;
+    }
+
+    // Estadísticas de productos
+    const { data: productStats, error: productError } = await supabase
+      .from('products')
+      .select('category, is_active, stock');
+
+    if (productError) {
+      throw productError;
+    }
+
+    // Procesar estadísticas
+    const dashboard = {
+      orders: orderStats,
+      users: {
+        total: userStats.length,
+        new_this_month: userStats.filter(u => new Date(u.created_at) >= thirtyDaysAgo).length,
+        active: userStats.filter(u => u.is_active).length,
+        by_role: userStats.reduce((acc, user) => {
+          acc[user.role] = (acc[user.role] || 0) + 1;
+          return acc;
+        }, {})
+      },
+      products: {
+        total: productStats.length,
+        active: productStats.filter(p => p.is_active).length,
+        out_of_stock: productStats.filter(p => p.stock === 0).length,
+        low_stock: productStats.filter(p => p.stock > 0 && p.stock <= 10).length,
+        by_category: productStats.reduce((acc, product) => {
+          acc[product.category] = (acc[product.category] || 0) + 1;
+          return acc;
+        }, {})
+      }
+    };
+
+    res.json({
+      success: true,
+      data: dashboard
+    });
+  } catch (error) {
+    console.error('Error obteniendo datos del dashboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;

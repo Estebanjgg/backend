@@ -10,6 +10,7 @@ class User {
     this.first_name = data.first_name;
     this.last_name = data.last_name;
     this.phone = data.phone;
+    this.role = data.role || 'user';
     this.is_active = data.is_active !== undefined ? data.is_active : true;
     this.email_verified = data.email_verified || false;
     this.created_at = data.created_at;
@@ -303,6 +304,7 @@ class User {
       first_name: this.first_name,
       last_name: this.last_name,
       phone: this.phone,
+      role: this.role,
       email_verified: this.email_verified,
       created_at: this.created_at,
       last_login: this.last_login

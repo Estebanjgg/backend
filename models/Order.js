@@ -419,6 +419,39 @@ class Order {
     }
   }
 
+  // Buscar orden por ID (para admin)
+  static async findById(orderId) {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(
+            id,
+            product_id,
+            quantity,
+            price,
+            product_title,
+            product_image
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Orden no encontrada
+        }
+        throw error;
+      }
+
+      return new Order(data);
+    } catch (error) {
+      console.error('Error en findById:', error);
+      throw error;
+    }
+  }
+
   // Obtener estadísticas de órdenes (para admin)
   static async getOrderStats(startDate = null, endDate = null) {
     try {
