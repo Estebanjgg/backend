@@ -340,6 +340,35 @@ router.get('/order/:orderNumber', async (req, res) => {
   }
 });
 
+// GET /api/checkout/order-by-id/:orderId - Obtener orden por ID
+router.get('/order-by-id/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await Order.getById(orderId, req.userId, req.sessionId);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo orden:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
 // GET /api/checkout/orders - Obtener órdenes del usuario
 router.get('/orders', async (req, res) => {
   try {

@@ -82,9 +82,13 @@ class Order {
       }
 
       // Calcular totales
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const subtotal = cartItems.reduce((sum, item) => {
+        const price = item.price || item.products?.current_price || 0;
+        return sum + (price * item.quantity);
+      }, 0);
+      
       const discount = cartItems.reduce((sum, item) => {
-        if (item.products && item.products.original_price) {
+        if (item.products && item.products.original_price && item.products.current_price) {
           return sum + ((item.products.original_price - item.products.current_price) * item.quantity);
         }
         return sum;
@@ -93,6 +97,13 @@ class Order {
       const shipping = orderData.shipping || 0;
       const tax = orderData.tax || 0;
       const total = subtotal + shipping + tax;
+
+      console.log('💰 Cálculos de totales:');
+      console.log('  - Subtotal:', subtotal);
+      console.log('  - Descuento:', discount);
+      console.log('  - Envío:', shipping);
+      console.log('  - Impuestos:', tax);
+      console.log('  - Total:', total);
 
       // Crear la orden
       const orderNumber = this.generateOrderNumber();
@@ -157,6 +168,7 @@ class Order {
       const orderItems = cartItems.map(item => {
         // Usar product_id directamente ya que ahora ambos son UUIDs
         const productId = item.product_id || item.products?.id;
+        const unitPrice = item.price || item.products?.current_price || 0;
         
         if (!productId) {
           throw new Error(`Product ID no encontrado para item: ${JSON.stringify(item)}`);
@@ -166,8 +178,8 @@ class Order {
           order_id: order.id,
           product_id: productId, // Ahora es UUID tanto en origen como destino
           quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
+          unit_price: unitPrice,
+          total_price: unitPrice * item.quantity,
           product_title: item.products?.title || 'Producto sin nombre',
           product_image: item.products?.image || item.products?.image_url,
           product_brand: item.products?.brand,
@@ -347,7 +359,69 @@ class Order {
     }
   }
 
-  // Obtener orden por número de orden
+  // Obtener orden por ID
+  static async getById(orderId, userId, sessionId) {
+    try {
+      console.log('Getting order by ID:', { orderId, userId, sessionId });
+
+      // Buscar la orden por ID
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) {
+        console.error('Error obteniendo orden:', orderError);
+        throw orderError;
+      }
+
+      if (!orderData) {
+        return null;
+      }
+
+      // Verificar que la orden pertenece al usuario o sesión
+      if (userId && orderData.user_id !== userId) {
+        return null;
+      }
+      if (!userId && sessionId && orderData.session_id !== sessionId) {
+        return null;
+      }
+
+      // Obtener los items de la orden
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          products:product_id (
+            id,
+            name,
+            description,
+            price,
+            image_url,
+            category_id,
+            stock
+          )
+        `)
+        .eq('order_id', orderId);
+
+      if (itemsError) {
+        console.error('Error obteniendo items de la orden:', itemsError);
+        throw itemsError;
+      }
+
+      const order = {
+        ...orderData,
+        order_items: orderItems || []
+      };
+
+      return order;
+
+    } catch (error) {
+      console.error('Error en getById:', error);
+      throw error;
+    }
+  }
   static async getByOrderNumber(orderNumber, userId = null, sessionId = null) {
     try {
       // Primero obtener la orden básica
