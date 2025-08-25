@@ -130,8 +130,22 @@ const paymentSchema = Joi.object({
   userId: Joi.string().allow(null).optional(),
   sessionId: Joi.string().allow(null).optional()
 }).external(async (value) => {
+  // Debug: mostrar qué valores estamos buscando
+  console.log('🔍 Debug Payment validation - buscando orden:');
+  console.log('  - order_id:', value.order_id);
+  console.log('  - userId:', value.userId);
+  console.log('  - sessionId:', value.sessionId);
+  
   // Verificar que la orden existe y pertenece al usuario
   const order = await Order.getById(value.order_id, value.userId, value.sessionId);
+  
+  console.log('  - orden encontrada:', order ? 'SÍ' : 'NO');
+  if (order) {
+    console.log('  - orden.user_id:', order.user_id);
+    console.log('  - orden.session_id:', order.session_id);
+    console.log('  - orden.payment_status:', order.payment_status);
+  }
+  
   if (!order) {
     throw new Error('Orden no encontrada');
   }
