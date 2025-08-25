@@ -11,6 +11,8 @@ const authRoutes = require('./routes/auth');
 const favoriteRoutes = require('./routes/favorites');
 const checkoutRoutes = require('./routes/checkout');
 const adminRoutes = require('./routes/admin');
+const paymentsRoutes = require('./routes/payments');
+const ordersRoutes = require('./routes/orders');
 const { setupSwagger } = require('./config/swagger');
 
 const app = express();
@@ -83,6 +85,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/orders', ordersRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -92,7 +96,14 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       products: '/api/products',
-      categories: '/api/categories'
+      categories: '/api/categories',
+      cart: '/api/cart',
+      auth: '/api/auth',
+      favorites: '/api/favorites',
+      checkout: '/api/checkout',
+      payments: '/api/payments',
+      orders: '/api/orders',
+      admin: '/api/admin'
     }
   });
 });

@@ -31,13 +31,34 @@ router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) 
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
-    // Construir query base
+    // Construir query base con más información
     let query = supabase
       .from('orders')
       .select(`
         *,
-        order_items(*)
-      `);
+        order_items(
+          id,
+          quantity,
+          unit_price,
+          total_price,
+          product_title,
+          product_image,
+          product_brand,
+          products(
+            id,
+            title,
+            image,
+            brand,
+            category
+          )
+        ),
+        payment_details(
+          transaction_id,
+          payment_method,
+          status,
+          created_at
+        )
+      `, { count: 'exact' });
 
     // Aplicar filtros
     if (status) {
@@ -72,9 +93,18 @@ router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) 
       throw error;
     }
 
+    // Procesar datos para incluir información adicional
+    const processedOrders = orders.map(order => ({
+      ...order,
+      shipping_address: order.shipping_address ? JSON.parse(order.shipping_address) : null,
+      billing_address: order.billing_address ? JSON.parse(order.billing_address) : null,
+      items_count: order.order_items?.length || 0,
+      payment_info: order.payment_details?.[0] || null
+    }));
+
     res.json({
       success: true,
-      data: orders,
+      data: processedOrders,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -241,6 +271,155 @@ router.get('/orders/stats', requireAdminPermission('view_analytics'), async (req
     });
   } catch (error) {
     console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/admin/orders/ready-to-ship - Obtener órdenes listas para envío
+router.get('/orders/ready-to-ship', requireAdminPermission('manage_orders'), async (req, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        customer_name,
+        customer_email,
+        customer_phone,
+        total,
+        created_at,
+        shipping_address,
+        order_items(
+          quantity,
+          product_title,
+          product_image
+        )
+      `)
+      .eq('status', 'confirmed')
+      .eq('payment_status', 'paid')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const processedOrders = orders.map(order => ({
+      ...order,
+      shipping_address: JSON.parse(order.shipping_address),
+      items_count: order.order_items?.length || 0
+    }));
+
+    res.json({
+      success: true,
+      data: processedOrders
+    });
+  } catch (error) {
+    console.error('Error obteniendo órdenes para envío:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/admin/orders/:id/ship - Marcar orden como enviada
+router.post('/orders/:id/ship',
+  requireAdminPermission('manage_orders'),
+  logAdminAction('ship_order'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { tracking_number, shipping_company, notes } = req.body;
+
+      const order = await Order.findById(id);
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Orden no encontrada'
+        });
+      }
+
+      if (order.status !== 'confirmed' || order.payment_status !== 'paid') {
+        return res.status(400).json({
+          success: false,
+          message: 'La orden debe estar confirmada y pagada para ser enviada'
+        });
+      }
+
+      // Actualizar orden con información de envío
+      const supabase = require('../config/supabase');
+      const { data: updatedOrder, error } = await supabase
+        .from('orders')
+        .update({
+          status: 'shipped',
+          tracking_number: tracking_number,
+          shipping_company: shipping_company,
+          admin_notes: notes,
+          shipped_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({
+        success: true,
+        message: 'Orden marcada como enviada exitosamente',
+        data: updatedOrder
+      });
+    } catch (error) {
+      console.error('Error enviando orden:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: error.message
+      });
+    }
+  }
+);
+
+// GET /api/admin/orders/pending-payment - Obtener órdenes con pago pendiente
+router.get('/orders/pending-payment', requireAdminPermission('manage_orders'), async (req, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        customer_name,
+        customer_email,
+        total,
+        payment_method,
+        created_at,
+        payment_details(
+          transaction_id,
+          payment_method,
+          status,
+          payment_data
+        )
+      `)
+      .eq('payment_status', 'pending')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data: orders
+    });
+  } catch (error) {
+    console.error('Error obteniendo órdenes con pago pendiente:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor',
