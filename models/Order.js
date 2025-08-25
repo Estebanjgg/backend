@@ -247,46 +247,45 @@ class Order {
       console.log('  - userId:', userId);
       console.log('  - sessionId:', sessionId);
       
-      // Primero obtener la orden básica
-      let query = supabase
+      // Intentar buscar la orden sin filtros para obtener información completa
+      console.log('  - Buscando orden sin filtros primero...');
+      const { data: orderWithoutFilters, error: noFilterError } = await supabase
         .from('orders')
         .select('*')
-        .eq('id', orderId);
-
-      // Filtrar por usuario o sesión si se proporciona
-      if (userId) {
-        console.log('  - Filtrando por userId');
-        query = query.eq('user_id', userId);
-      } else if (sessionId) {
-        console.log('  - Filtrando por sessionId');
-        query = query.eq('session_id', sessionId);
-      } else {
-        console.log('  - Sin filtros adicionales (solo orderId)');
-      }
-
-      const { data: order, error: orderError } = await query.single();
-
-      if (orderError) {
-        console.error('Error obteniendo orden:', orderError);
+        .eq('id', orderId)
+        .single();
         
-        // Intentemos buscar la orden sin filtros para ver si existe
-        console.log('  - Intentando buscar orden sin filtros...');
-        const { data: orderWithoutFilters, error: noFilterError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('id', orderId)
-          .single();
-          
-        if (noFilterError) {
-          console.log('  - Orden no existe en absoluto:', noFilterError.message);
-        } else {
-          console.log('  - Orden SÍ existe pero con filtros RLS diferentes:');
-          console.log('    - order.user_id:', orderWithoutFilters.user_id);
-          console.log('    - order.session_id:', orderWithoutFilters.session_id);
-        }
-        
-        throw orderError;
+      if (noFilterError) {
+        console.log('  - Orden no existe en absoluto:', noFilterError.message);
+        throw noFilterError;
       }
+      
+      console.log('  - Orden encontrada:');
+      console.log('    - order.user_id:', orderWithoutFilters.user_id);
+      console.log('    - order.session_id:', orderWithoutFilters.session_id);
+      
+      // Verificar que el usuario/sesión tiene permisos para ver esta orden
+      const canAccess = (
+        // Si la orden tiene user_id y coincide con el userId pasado
+        (orderWithoutFilters.user_id && userId && orderWithoutFilters.user_id === userId) ||
+        // Si la orden tiene session_id y coincide con el sessionId pasado
+        (orderWithoutFilters.session_id && sessionId && orderWithoutFilters.session_id === sessionId) ||
+        // Si la orden es anónima (user_id null) y tenemos sessionId que coincide
+        (!orderWithoutFilters.user_id && orderWithoutFilters.session_id && sessionId && orderWithoutFilters.session_id === sessionId) ||
+        // Si no hay filtros específicos, permitir acceso (para casos de administrador)
+        (!userId && !sessionId)
+      );
+      
+      if (!canAccess) {
+        console.log('  - Acceso denegado: los parámetros no coinciden con la orden');
+        const error = new Error('JSON object requested, multiple (or no) rows returned');
+        error.code = 'PGRST116';
+        error.details = 'The result contains 0 rows';
+        throw error;
+      }
+      
+      console.log('  - Acceso permitido ✅');
+      const order = orderWithoutFilters;
 
       if (!order) {
         return null;
