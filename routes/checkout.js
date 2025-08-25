@@ -178,7 +178,11 @@ router.post('/validate', async (req, res) => {
 
     // Verificar stock de todos los productos
     const stockErrors = [];
+    console.log('🔍 Verificando stock de productos...');
+    
     for (const item of cartItems) {
+      console.log(`🔍 Verificando producto ${item.product_id}, cantidad: ${item.quantity}`);
+      
       const supabase = require('../config/supabase');
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -187,19 +191,26 @@ router.post('/validate', async (req, res) => {
         .single();
 
       if (productError || !product) {
+        console.log(`❌ Producto ${item.product_id} no encontrado:`, productError);
         stockErrors.push(`Producto ${item.product_id} no encontrado`);
         continue;
       }
 
+      console.log(`📦 Producto ${product.title}: stock=${product.stock}, is_active=${product.is_active}`);
+
       if (!product.is_active) {
+        console.log(`❌ Producto ${product.title} no está activo`);
         stockErrors.push(`${product.title} ya no está disponible`);
         continue;
       }
 
       if (product.stock < item.quantity) {
+        console.log(`❌ Stock insuficiente para ${product.title}: disponible=${product.stock}, solicitado=${item.quantity}`);
         stockErrors.push(`Stock insuficiente para ${product.title}. Disponible: ${product.stock}`);
       }
     }
+
+    console.log('🔍 Errores de stock encontrados:', stockErrors);
 
     if (stockErrors.length > 0) {
       return res.status(400).json({
