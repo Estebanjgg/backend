@@ -176,10 +176,26 @@ class Order {
 
       // Actualizar stock de productos
       for (const item of cartItems) {
+        // Primero obtener el stock actual
+        const { data: currentProduct, error: getError } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', item.product_id)
+          .single();
+          
+        if (getError) {
+          console.error('Error obteniendo stock actual:', getError);
+          continue; // Continuar con el siguiente item
+        }
+        
+        // Calcular nuevo stock
+        const newStock = currentProduct.stock - item.quantity;
+        
+        // Actualizar stock
         const { error: stockError } = await supabase
           .from('products')
           .update({
-            stock: supabase.raw(`stock - ${item.quantity}`),
+            stock: newStock,
             updated_at: new Date().toISOString()
           })
           .eq('id', item.product_id);
@@ -187,6 +203,8 @@ class Order {
         if (stockError) {
           console.error('Error actualizando stock:', stockError);
           // En caso de error, podrías implementar rollback o logging adicional
+        } else {
+          console.log(`✅ Stock actualizado para producto ${item.product_id}: ${currentProduct.stock} → ${newStock}`);
         }
       }
 
