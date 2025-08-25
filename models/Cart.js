@@ -58,6 +58,7 @@ class Cart {
 
         // Si no encontramos por sessionId, busquemos si hay items huérfanos con user_id pero sin session_id
         // Esto puede pasar cuando el usuario se loguea después de agregar al carrito
+        // Como no tenemos userId en esta búsqueda, buscaremos items recientes que puedan corresponder a esta sesión
         const { data: orphanData, error: orphanError } = await supabase
           .from('cart_items')
           .select(`
@@ -77,7 +78,9 @@ class Cart {
           `)
           .not('user_id', 'is', null)
           .is('session_id', null)
-          .order('created_at', { ascending: false });
+          .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Últimos 7 días
+          .order('created_at', { ascending: false })
+          .limit(20); // Limitamos para evitar demasiados resultados
 
         if (orphanError) {
           console.error('Error obteniendo carrito huérfano:', orphanError);
