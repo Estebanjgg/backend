@@ -50,26 +50,14 @@ const optionalAuth = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    console.log('🔍 optionalAuth - authHeader:', authHeader ? 'EXISTS' : 'MISSING');
-    console.log('🔍 optionalAuth - token:', token ? 'EXISTS' : 'MISSING');
-
     if (token) {
-      console.log('🔍 Verificando token...');
       const decoded = User.verifyToken(token);
-      console.log('🔍 Token decoded:', decoded ? 'SUCCESS' : 'FAILED');
-      
       if (decoded) {
-        console.log('🔍 Buscando usuario con ID:', decoded.id);
         const user = await User.findById(decoded.id);
         if (user) {
-          console.log('✅ Usuario encontrado:', user.email);
           req.user = user;
-        } else {
-          console.log('❌ Usuario no encontrado en BD');
         }
       }
-    } else {
-      console.log('❌ No hay token en la request');
     }
 
     next();
@@ -83,18 +71,12 @@ const optionalAuth = async (req, res, next) => {
 // Middleware para generar o recuperar session_id
 const ensureSession = (req, res, next) => {
   try {
-    console.log('🔍 ensureSession - req.user:', req.user ? 'EXISTS' : 'NULL');
-    console.log('🔍 ensureSession - req.headers.authorization:', req.headers['authorization'] ? 'EXISTS' : 'MISSING');
-    
     // Si hay usuario autenticado, usar su ID
     if (req.user) {
-      console.log('✅ Usuario autenticado encontrado, ID:', req.user.id);
       req.userId = req.user.id;
       req.sessionId = null;
       return next();
     }
-
-    console.log('❌ No hay usuario autenticado, usando sesión anónima');
 
     // Para usuarios anónimos, generar o usar session_id
     let sessionId = req.headers['x-session-id'] || req.query.session_id;
@@ -109,7 +91,6 @@ const ensureSession = (req, res, next) => {
 
     req.userId = null;
     req.sessionId = sessionId;
-    console.log('🔧 Session ID establecido:', sessionId);
     next();
   } catch (error) {
     console.error('Error en ensureSession:', error);
