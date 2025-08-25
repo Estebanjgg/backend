@@ -10,6 +10,43 @@ router.use(optionalAuth);
 router.use(ensureSession);
 
 // Esquemas de validación
+const checkoutValidationSchema = Joi.object({
+  customer_name: Joi.string().required().min(2).max(100),
+  customer_email: Joi.string().email().required(),
+  customer_phone: Joi.string().required().min(10).max(20),
+  
+  shipping_address: Joi.object({
+    street: Joi.string().required(),
+    number: Joi.string().required(),
+    complement: Joi.string().allow(''),
+    neighborhood: Joi.string().required(),
+    city: Joi.string().required(),
+    state: Joi.string().required(),
+    postal_code: Joi.string().required(),
+    country: Joi.string().default('Brasil')
+  }).required(),
+  
+  billing_address: Joi.object({
+    street: Joi.string().required(),
+    number: Joi.string().required(),
+    complement: Joi.string().allow(''),
+    neighborhood: Joi.string().required(),
+    city: Joi.string().required(),
+    state: Joi.string().required(),
+    postal_code: Joi.string().required(),
+    country: Joi.string().default('Brasil')
+  }).required(),
+  
+  payment_method: Joi.string().valid('credit_card', 'debit_card', 'pix', 'boleto').allow(''),
+  
+  same_as_shipping: Joi.boolean().default(true),
+  notes: Joi.string().allow('').max(500),
+  
+  // Campos opcionales para cálculos
+  shipping: Joi.number().min(0).default(0),
+  tax: Joi.number().min(0).default(0)
+});
+
 const checkoutSchema = Joi.object({
   customer_name: Joi.string().required().min(2).max(100),
   customer_email: Joi.string().email().required(),
@@ -35,7 +72,7 @@ const checkoutSchema = Joi.object({
     state: Joi.string().required(),
     postal_code: Joi.string().required(),
     country: Joi.string().default('Brasil')
-  }).optional(),
+  }).required(),
   
   payment_method: Joi.string().valid('credit_card', 'debit_card', 'pix', 'boleto').required(),
   
@@ -50,8 +87,8 @@ const checkoutSchema = Joi.object({
 // POST /api/checkout/validate - Validar datos de checkout sin crear orden
 router.post('/validate', async (req, res) => {
   try {
-    // Validar datos del formulario
-    const { error, value } = checkoutSchema.validate(req.body);
+    // Validar datos del formulario (sin requerir payment_method)
+    const { error, value } = checkoutValidationSchema.validate(req.body);
     
     if (error) {
       return res.status(400).json({
