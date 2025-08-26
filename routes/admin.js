@@ -1,7 +1,4 @@
 const express = require('express');
-const Order = require('../models/Order');
-const Product = require('../models/Product');
-const User = require('../models/User');
 const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth');
 const { requireAdmin, requireAdminPermission, logAdminAction } = require('../middleware/adminAuth');
@@ -233,8 +230,14 @@ router.put('/orders/:id/payment-status',
         });
       }
 
-      const order = await Order.findById(id);
-      if (!order) {
+      // Verificar que la orden existe
+      const { data: existingOrder, error: checkError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !existingOrder) {
         return res.status(404).json({
           success: false,
           message: 'Orden no encontrada'
@@ -242,7 +245,19 @@ router.put('/orders/:id/payment-status',
       }
 
       // Actualizar estado de pago
-      const updatedOrder = await Order.updatePaymentStatus(id, payment_status);
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          payment_status: payment_status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
 
       res.json({
         success: true,
@@ -284,7 +299,30 @@ router.get('/orders/stats', requireAdminPermission('view_analytics'), async (req
         startDate.setDate(startDate.getDate() - 30);
     }
 
-    const stats = await Order.getOrderStats(startDate.toISOString());
+    // Obtener estadísticas directamente de Supabase
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('status, payment_status, total, created_at')
+      .gte('created_at', startDate.toISOString());
+
+    if (error) {
+      throw error;
+    }
+
+    // Procesar estadísticas
+    const stats = {
+      total_orders: orders.length,
+      total_revenue: orders.reduce((sum, order) => sum + (order.total || 0), 0),
+      orders_by_status: {},
+      orders_by_payment_status: {},
+      average_order_value: orders.length > 0 ? orders.reduce((sum, order) => sum + (order.total || 0), 0) / orders.length : 0
+    };
+
+    // Agrupar por estado
+    orders.forEach(order => {
+      stats.orders_by_status[order.status] = (stats.orders_by_status[order.status] || 0) + 1;
+      stats.orders_by_payment_status[order.payment_status] = (stats.orders_by_payment_status[order.payment_status] || 0) + 1;
+    });
 
     res.json({
       success: true,
@@ -357,8 +395,14 @@ router.post('/orders/:id/ship',
       const { id } = req.params;
       const { tracking_number, shipping_company, notes } = req.body;
 
-      const order = await Order.findById(id);
-      if (!order) {
+      // Verificar que la orden existe y tiene el estado correcto
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('id, status, payment_status')
+        .eq('id', id)
+        .single();
+
+      if (orderError || !order) {
         return res.status(404).json({
           success: false,
           message: 'Orden no encontrada'
@@ -465,21 +509,53 @@ router.get('/products', requireAdminPermission('manage_products'), async (req, r
       in_stock
     } = req.query;
 
-    const products = await Product.findAll({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      category,
-      brand,
-      search,
-      sortBy: sort_by,
-      sortOrder: sort_order,
-      inStock: in_stock
-    });
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Construir query de productos
+    let query = supabase
+      .from('products')
+      .select('*', { count: 'exact' });
+
+    // Aplicar filtros
+    if (category) {
+      query = query.eq('category', category);
+    }
+    
+    if (brand) {
+      query = query.eq('brand', brand);
+    }
+    
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+    
+    if (in_stock === 'true') {
+      query = query.gt('stock', 0);
+    } else if (in_stock === 'false') {
+      query = query.eq('stock', 0);
+    }
+
+    // Aplicar ordenamiento
+    query = query.order(sort_by, { ascending: sort_order === 'asc' });
+    
+    // Aplicar paginación
+    query = query.range(offset, offset + parseInt(limit) - 1);
+
+    const { data: products, error, count } = await query;
+
+    if (error) {
+      throw error;
+    }
 
     res.json({
       success: true,
-      data: products.products,
-      pagination: products.pagination
+      data: products,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
+      }
     });
   } catch (error) {
     console.error('Error obteniendo productos:', error);
@@ -521,11 +597,20 @@ router.post('/products',
         });
       }
 
-      const product = await Product.create(value);
+      // Criar produto diretamente no Supabase
+      const { data: product, error: createError } = await supabase
+        .from('products')
+        .insert([value])
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
 
       res.status(201).json({
         success: true,
-        message: 'Producto creado exitosamente',
+        message: 'Produto criado exitosamente',
         data: product
       });
     } catch (error) {
@@ -548,15 +633,34 @@ router.put('/products/:id',
       const { id } = req.params;
       const updateData = req.body;
 
-      const product = await Product.findById(id);
-      if (!product) {
+      // Verificar que el producto existe
+      const { data: existingProduct, error: checkError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !existingProduct) {
         return res.status(404).json({
           success: false,
           message: 'Producto no encontrado'
         });
       }
 
-      const updatedProduct = await Product.update(id, updateData);
+      // Actualizar producto
+      const { data: updatedProduct, error: updateError } = await supabase
+        .from('products')
+        .update({
+          ...updateData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
 
       res.json({
         success: true,
@@ -582,15 +686,29 @@ router.delete('/products/:id',
     try {
       const { id } = req.params;
 
-      const product = await Product.findById(id);
-      if (!product) {
+      // Verificar que el producto existe
+      const { data: existingProduct, error: checkError } = await supabase
+        .from('products')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !existingProduct) {
         return res.status(404).json({
           success: false,
           message: 'Producto no encontrado'
         });
       }
 
-      await Product.delete(id);
+      // Eliminar producto
+      const { error: deleteError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
 
       res.json({
         success: true,
@@ -742,8 +860,30 @@ router.get('/dashboard', requireAdminPermission('view_analytics'), async (req, r
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
     
-    // Estadísticas de órdenes
-    const orderStats = await Order.getOrderStats(thirtyDaysAgo.toISOString());
+    // Estadísticas de órdenes directamente de Supabase
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select('status, payment_status, total, created_at')
+      .gte('created_at', thirtyDaysAgo.toISOString());
+
+    if (orderError) {
+      throw orderError;
+    }
+
+    // Procesar estadísticas de órdenes
+    const orderStats = {
+      total_orders: orderData.length,
+      total_revenue: orderData.reduce((sum, order) => sum + (order.total || 0), 0),
+      orders_by_status: {},
+      orders_by_payment_status: {},
+      average_order_value: orderData.length > 0 ? orderData.reduce((sum, order) => sum + (order.total || 0), 0) / orderData.length : 0
+    };
+
+    // Agrupar por estado
+    orderData.forEach(order => {
+      orderStats.orders_by_status[order.status] = (orderStats.orders_by_status[order.status] || 0) + 1;
+      orderStats.orders_by_payment_status[order.payment_status] = (orderStats.orders_by_payment_status[order.payment_status] || 0) + 1;
+    });
     
     // Estadísticas de usuarios
     const { data: userStats, error: userError } = await supabase
