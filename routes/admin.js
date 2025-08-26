@@ -31,34 +31,10 @@ router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) 
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
-    // Construir query base con más información
+    // Consulta básica de órdenes sin relaciones problemáticas
     let query = supabase
       .from('orders')
-      .select(`
-        *,
-        order_items(
-          id,
-          quantity,
-          unit_price,
-          total_price,
-          product_title,
-          product_image,
-          product_brand,
-          products(
-            id,
-            title,
-            image,
-            brand,
-            category
-          )
-        ),
-        payment_details(
-          transaction_id,
-          payment_method,
-          status,
-          created_at
-        )
-      `, { count: 'exact' });
+      .select('*', { count: 'exact' });
 
     // Aplicar filtros
     if (status) {
@@ -93,13 +69,11 @@ router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) 
       throw error;
     }
 
-    // Procesar datos para incluir información adicional
+    // Procesar datos básicos
     const processedOrders = orders.map(order => ({
       ...order,
       shipping_address: order.shipping_address ? JSON.parse(order.shipping_address) : null,
-      billing_address: order.billing_address ? JSON.parse(order.billing_address) : null,
-      items_count: order.order_items?.length || 0,
-      payment_info: order.payment_details?.[0] || null
+      billing_address: order.billing_address ? JSON.parse(order.billing_address) : null
     }));
 
     res.json({
