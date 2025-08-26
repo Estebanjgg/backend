@@ -100,18 +100,46 @@ router.get('/orders', requireAdminPermission('manage_orders'), async (req, res) 
 router.get('/orders/:id', requireAdminPermission('manage_orders'), async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findById(id);
     
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Orden no encontrada'
-      });
+    // Obtener orden básica
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (orderError) {
+      if (orderError.code === 'PGRST116') {
+        return res.status(404).json({
+          success: false,
+          message: 'Orden no encontrada'
+        });
+      }
+      throw orderError;
     }
+
+    // Obtener items de la orden por separado
+    const { data: orderItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', id);
+
+    if (itemsError) {
+      console.error('Error obteniendo items:', itemsError);
+      // Continuar sin items si hay error
+    }
+
+    // Procesar datos
+    const processedOrder = {
+      ...order,
+      shipping_address: order.shipping_address ? JSON.parse(order.shipping_address) : null,
+      billing_address: order.billing_address ? JSON.parse(order.billing_address) : null,
+      order_items: orderItems || []
+    };
 
     res.json({
       success: true,
-      data: order
+      data: processedOrder
     });
   } catch (error) {
     console.error('Error obteniendo orden:', error);
