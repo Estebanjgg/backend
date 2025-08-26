@@ -169,8 +169,14 @@ router.put('/orders/:id/status',
         });
       }
 
-      const order = await Order.findById(id);
-      if (!order) {
+      // Verificar que la orden existe
+      const { data: existingOrder, error: checkError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !existingOrder) {
         return res.status(404).json({
           success: false,
           message: 'Orden no encontrada'
@@ -178,7 +184,20 @@ router.put('/orders/:id/status',
       }
 
       // Actualizar orden
-      const updatedOrder = await Order.updateStatus(id, status, notes);
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: status,
+          admin_notes: notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
 
       res.json({
         success: true,
